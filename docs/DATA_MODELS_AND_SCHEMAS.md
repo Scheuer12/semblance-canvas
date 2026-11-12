@@ -64,8 +64,18 @@ Represents an individual visual entity on the canvas.
     },
     "type": {
       "type": "string",
-      "enum": ["concept", "group", "template_branch", "placeholder"],
-      "description": "Classification of the node"
+      "enum": [
+        "concept",
+        "process_step",
+        "side_annotation",
+        "data_store",
+        "decision_gate",
+        "actor",
+        "group",
+        "template_branch",
+        "placeholder"
+      ],
+      "description": "Classification of the node determining its visual geometry and De-Para styling"
     },
     "source_ids": {
       "type": "array",

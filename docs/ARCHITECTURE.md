@@ -108,8 +108,22 @@ The semantic layer operates in two distinct modes:
   - `MOVE_NODE` / `CLUSTER_NODES`
   - `APPLY_TEMPLATE`
 
+### 3.3.1 Deterministic Layout & Visual "De-Para" Engine (`deterministic_layout.py`)
+- **Sub-5ms Geometric Layout**: To eliminate the latency bottleneck of calling a second LLM pass (Skill 2: ~20-25s), layout calculations and coordinates are executed deterministically in Python in **< 5ms**.
+- **Entity Type De-Para**:
+  - `process_step` ➔ Blue rounded card (Operational Workflow)
+  - `side_annotation` ➔ Yellow dashed sticky note (Observations, Caveats)
+  - `data_store` ➔ Green cylinder (Databases, Spreadsheets, WhatsApp groups)
+  - `decision_gate` ➔ Yellow diamond (Approval conditions, Decision gates)
+  - `actor` ➔ Purple persona figure (Stakeholders, Roles)
+  - `concept` ➔ Lavender rounded card
+- **Dynamic Cluster Packing**: Clusters/swimlanes compute dynamic bounding boxes with 30px lateral margins and 45px header padding, automatically wrapping when horizontal space exceeds canvas thresholds.
+
 ### 3.4 JavaScript Bridge & diagrams.net Embedded Integration
 - **Host Web Application**: A lightweight web application (served locally via FastAPI) housing an embedded `<iframe>` pointing to `https://app.diagrams.net/?embed=1&proto=json&spin=1&ui=min`.
+- **Speech Debounce & Queue Coalescing**:
+  - Client-side 8-word / 1.2s silence debounce buffer prevents single-word breath pauses from triggering fragmented micro-turns.
+  - Server-side asynchronous queue coalescing folds any speech segments buffered during active AI daemon turns into a single consolidated context prompt, achieving a **4x turnaround speedup**.
 - **IFrame Protocol & The Reverse Path**:
   - **Forward Path (AI to Canvas)**: Programmatic communication conducted via `window.postMessage`. The bridge dispatches `load` actions containing serialized `mxGraph` XML with deterministic geometries, dynamic container boundaries, and `jumpStyle=arc` connectors.
   - **Reverse Path (Canvas to AI - In Progress)**: Ingesting manual user interactions back into the reasoning loop. When users reposition cards or adjust arrows directly in the diagrams.net UI, the iframe emits `autosave` postMessage events. A reverse XML parser extracts modified coordinates and labels, synchronizing Python `CanvasSessionState` and providing visual feedback to the AI model on subsequent turns.

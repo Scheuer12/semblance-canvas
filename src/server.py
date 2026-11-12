@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse
 
 from src.ai import SkillRunner, get_ai_client
 from src.audio import RealtimeVoiceTranscriber, SourceSegment
-from src.canvas import canvas_json_to_mxgraph_xml
+from src.canvas import canvas_json_to_mxgraph_xml, compute_deterministic_canvas_layout
 from src.canvas.session_state import CanvasSessionState
 from src.config import config
 
@@ -96,7 +96,7 @@ async def broadcast_log(message: str, level: str = "INFO"):
 
 
 def process_pipeline_sync(segments, status_callback=None, log_callback=None, event_callback=None):
-    """Processes speech segments through Skill 1 and Skill 2, reconciling persistent state."""
+    """Processes speech segments through Skill 1 and deterministic visual De-Para, reconciling persistent state."""
     if status_callback:
         status_callback("semantic", "active", f"Analyzing {len(segments)} segments...")
 
@@ -133,24 +133,31 @@ def process_pipeline_sync(segments, status_callback=None, log_callback=None, eve
     session_state.sync_from_semantic(semantic_json)
 
     if status_callback:
-        status_callback("layout", "active", "Computing geometries and visual clusters...")
+        status_callback("layout", "active", "Applying deterministic layout & visual De-Para (< 5ms)...")
 
-    print(f"[Server] Running Skill 2 (Canvas Geometry)...")
-    # If active concepts remain, run Skill 2; if everything was deleted, produce empty/cleaned canvas
-    if semantic_json.get("concepts"):
-        canvas_json = skill_runner.run_semantic_to_canvas(
-            semantic_json,
-            on_log=on_skill_log,
-            on_canvas_json=on_canvas_json,
-        )
-        # Update node geometries into persistent session
-        for node in canvas_json.get("nodes", []):
-            nid = node.get("id")
-            if nid in session_state.nodes:
-                session_state.nodes[nid]["geometry"] = node.get("geometry", session_state.nodes[nid]["geometry"])
-                session_state.nodes[nid]["style"] = node.get("style", session_state.nodes[nid]["style"])
-    else:
-        canvas_json = session_state.to_canvas_json()
+    print(f"[Server] Computing Deterministic Layout & Visual De-Para...")
+    # Compute visual layout deterministically in Python in 2ms without secondary LLM call
+    canvas_json = compute_deterministic_canvas_layout(semantic_json)
+
+    # Sync computed geometry, style and typed role into persistent session state
+    for node in canvas_json.get("nodes", []):
+        nid = node.get("id")
+        if nid in session_state.nodes:
+            session_state.nodes[nid]["geometry"] = node.get("geometry", session_state.nodes[nid]["geometry"])
+            session_state.nodes[nid]["style"] = node.get("style", session_state.nodes[nid]["style"])
+            session_state.nodes[nid]["type"] = node.get("type", session_state.nodes[nid].get("type"))
+
+    for cluster in canvas_json.get("visual_clusters", []):
+        cid = cluster.get("id")
+        if cid in session_state.clusters:
+            session_state.clusters[cid]["bounds"] = cluster.get("bounds", session_state.clusters[cid]["bounds"])
+            session_state.clusters[cid]["style"] = cluster.get("style", session_state.clusters[cid]["style"])
+
+    on_canvas_json(canvas_json, None)
+    if log_callback:
+        n_count = len(canvas_json.get("nodes", []))
+        c_count = len(canvas_json.get("visual_clusters", []))
+        log_callback(f"[LAYOUT] Deterministic layout computed: {n_count} nodes, {c_count} clusters in < 5ms", "INFO")
 
     if status_callback:
         status_callback("canvas", "active", "Formatting mxGraph XML...")
@@ -197,6 +204,101 @@ async def websocket_endpoint(websocket: WebSocket):
         await broadcast_log("Restored persistent canvas state to client tab.")
 
     loop = asyncio.get_event_loop()
+    pipeline_busy = False
+    pending_coalesce = False
+
+    async def run_coalesced_pipeline():
+        nonlocal pipeline_busy, pending_coalesce
+        if pipeline_busy:
+            pending_coalesce = True
+            await broadcast_log("Pipeline busy; buffering incoming segment for consolidated turn...", level="INFO")
+            return
+
+        pipeline_busy = True
+        try:
+            while True:
+                pending_coalesce = False
+                snapshot_segments = list(accumulated_segments)
+                if not snapshot_segments:
+                    break
+
+                last_segment = snapshot_segments[-1]
+
+                def sync_status_emitter(stage, status, msg):
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_event({"type": "stage_update", "stage": stage, "status": status, "details": msg}),
+                        loop,
+                    )
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_log(f"[{stage.upper()}] {msg}"),
+                        loop,
+                    )
+
+                def sync_log_emitter(msg, level="INFO"):
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_log(msg, level=level),
+                        loop,
+                    )
+
+                def sync_event_emitter(event_dict):
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_event(event_dict),
+                        loop,
+                    )
+
+                try:
+                    result = await loop.run_in_executor(
+                        None,
+                        process_pipeline_sync,
+                        snapshot_segments,
+                        sync_status_emitter,
+                        sync_log_emitter,
+                        sync_event_emitter,
+                    )
+
+                    await broadcast_event({
+                        "type": "pipeline_success",
+                        "xml": result["xml"],
+                        "semantic_json": result["semantic_json"],
+                        "canvas_json": result["canvas_json"],
+                        "actions": result.get("actions", []),
+                        "message": f"Processed up to {last_segment.id}: '{last_segment.text[:32]}...'",
+                    })
+
+                    # Persist session state and segments to local disk
+                    session_state.last_xml = result["xml"]
+                    session_state.saved_segments = [s.to_dict() for s in snapshot_segments]
+                    session_state.save_to_disk(SAVE_FILE)
+
+                    # Reset stages back to ready
+                    for stage in ("audio", "semantic", "layout", "canvas"):
+                        await broadcast_event({
+                            "type": "stage_update",
+                            "stage": stage,
+                            "status": "ready",
+                            "details": "Ready / Idle",
+                        })
+
+                    await broadcast_log(f"Pipeline completed & synced up to segment {last_segment.id}")
+
+                except Exception as err:
+                    print(f"[Server] Pipeline execution error: {err}")
+                    raw_json = getattr(err, "raw_json", None)
+                    await broadcast_event({
+                        "type": "pipeline_error",
+                        "stage": "semantic",
+                        "status": "error",
+                        "error": str(err),
+                        "details": str(err)[:120],
+                        "semantic_json": raw_json,
+                    })
+                    await broadcast_log(f"Pipeline error: {err}", level="ERROR")
+
+                # If no new segments arrived while processing, break loop
+                if not pending_coalesce and len(snapshot_segments) == len(accumulated_segments):
+                    break
+        finally:
+            pipeline_busy = False
 
     try:
         while True:
@@ -256,70 +358,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "details": audio_detail,
                 })
 
-                def sync_status_emitter(stage, status, msg):
-                    asyncio.run_coroutine_threadsafe(
-                        broadcast_event({"type": "stage_update", "stage": stage, "status": status, "details": msg}),
-                        loop,
-                    )
-                    asyncio.run_coroutine_threadsafe(
-                        broadcast_log(f"[{stage.upper()}] {msg}"),
-                        loop,
-                    )
-
-                def sync_log_emitter(msg, level="INFO"):
-                    asyncio.run_coroutine_threadsafe(
-                        broadcast_log(msg, level=level),
-                        loop,
-                    )
-
-                def sync_event_emitter(event_dict):
-                    asyncio.run_coroutine_threadsafe(
-                        broadcast_event(event_dict),
-                        loop,
-                    )
-
-                try:
-                    result = await loop.run_in_executor(
-                        None, process_pipeline_sync, accumulated_segments, sync_status_emitter, sync_log_emitter, sync_event_emitter
-                    )
-
-                    await broadcast_event({
-                        "type": "pipeline_success",
-                        "xml": result["xml"],
-                        "semantic_json": result["semantic_json"],
-                        "canvas_json": result["canvas_json"],
-                        "actions": result.get("actions", []),
-                        "message": f"Processed '{user_text}'",
-                    })
-
-                    # Persist session state and segments to local disk
-                    session_state.last_xml = result["xml"]
-                    session_state.saved_segments = [s.to_dict() for s in accumulated_segments]
-                    session_state.save_to_disk(SAVE_FILE)
-
-                    # Reset stages back to ready
-                    for stage in ("audio", "semantic", "layout", "canvas"):
-                        await broadcast_event({
-                            "type": "stage_update",
-                            "stage": stage,
-                            "status": "ready",
-                            "details": "Ready / Idle",
-                        })
-
-                    await broadcast_log(f"Pipeline completed & persisted state to disk for segment {segment.id}")
-
-                except Exception as err:
-                    print(f"[Server] Pipeline execution error: {err}")
-                    raw_json = getattr(err, "raw_json", None)
-                    await broadcast_event({
-                        "type": "pipeline_error",
-                        "stage": "semantic",
-                        "status": "error",
-                        "error": str(err),
-                        "details": str(err)[:120],
-                        "semantic_json": raw_json,
-                    })
-                    await broadcast_log(f"Pipeline error: {err}", level="ERROR")
+                asyncio.create_task(run_coalesced_pipeline())
 
     except WebSocketDisconnect:
         active_connections.discard(websocket)

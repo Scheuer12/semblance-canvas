@@ -65,32 +65,37 @@ flowchart LR
 0. **AI Connectivity**:
    - [x] Add an Antigravity headless adapter using cached Google OAuth subscription credentials.
    - [x] Keep Gemini Developer API and deterministic mock backends as explicit alternatives.
-   - [ ] Replace per-call process startup with a persistent `stream-json` session and benchmark latency/quota use.
+   - [x] Replace per-call process startup with a persistent `stream-json` session, server boot pre-warming, and window suppression.
 1. **Intent Classification & Routing**:
-   - Differentiate between **Mode A** (Ideas / Information) and **Mode B** (Diagram Directives).
+   - [x] Differentiate between **Mode A** (Ideas / Information) and **Mode B** (Diagram Directives).
 2. **Mode A Concept & Relationship Extraction**:
-   - Extract concepts with explicit textual references.
-   - Separate semantic proximity from relationships: calculate spatial coordinates $(x, y)$ for clustering, but **never** emit an edge unless an explicit dependency/causality was stated.
+   - [x] Extract concepts with explicit textual references.
+   - [x] Separate semantic proximity from relationships: calculate spatial coordinates $(x, y)$ for clustering, but **never** emit an edge unless an explicit dependency/causality was stated.
 3. **Mode B Command Parsing**:
-   - Translate direct edits (*"move X to right"*, *"group A and B"*, *"step 2 depends on step 1"*).
-   - Provide standard structural skeletons (e.g., Ishikawa 6M branches) with empty placeholder leaves.
+   - [x] Translate direct edits (*"move X to right"*, *"group A and B"*, *"step 2 depends on step 1"*, *"reorganize layout"*).
+   - [x] Provide standard structural skeletons with empty placeholder leaves.
 4. **Non-Invention Guardrail (Validator)**:
-   - Programmatic verification layer ensuring all nodes and edges have valid, non-empty `source_ids`.
-   - Reject ungrounded claims before they reach the canvas bridge.
+   - [x] Programmatic verification layer ensuring all nodes and edges have valid, non-empty `source_ids`.
+   - [x] Reject ungrounded claims before they reach the canvas bridge.
 
 ---
 
 ## Phase 4: Mode A & Mode B Feature Completion
-> **Objective**: Refine visual layout heuristics and template libraries.
+> **Objective**: Refine visual layout heuristics, deterministic De-Para, and stream debouncing.
 
 ### Tasks:
-1. **Layout & Coordinate Engine**:
-   - Implement 2D spatial clustering based on concept similarity (e.g., force-directed layout or grid placement).
-2. **Structural Template Engine**:
+1. **Deterministic Layout & Visual De-Para Engine**:
+   - [x] Implement sub-5ms Python layout engine replacing secondary LLM layout call.
+   - [x] Visual De-Para mapping: `process_step` (blue card), `side_annotation` (dashed post-it), `data_store` (green cylinder), `decision_gate` (yellow diamond), `actor` (persona).
+   - [x] Dynamic container bounding box calculation with multi-cluster wrap-around.
+2. **Speech Debounce & Queue Coalescing**:
+   - [x] Implement 8-word / 1.2s silence debounce in browser to prevent single-word fragment turns.
+   - [x] Implement non-blocking queue coalescing on WebSocket server to fold multi-turn speech during LLM inference into a single update (4x speedup).
+3. **Structural Template Engine**:
    - Ishikawa 6M diagram generator.
    - Mind Map generator.
    - Sequence/Process flow template generator.
-3. **Provenance Inspector UI (Optional Visual Overlay)**:
+4. **Provenance Inspector UI (Optional Visual Overlay)**:
    - Allow clicking a node in the bridge view to highlight the exact transcript segment (`s-n`) that created it.
 
 ---

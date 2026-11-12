@@ -749,6 +749,23 @@
     // Voice Dictation (Web Speech API) & Speech Submission
     let speechRecognizer = null;
     let isRecordingVoice = false;
+    let speechDebounceTimer = null;
+    let bufferedSpeechText = '';
+
+    function flushBufferedSpeech() {
+      if (speechDebounceTimer) {
+        clearTimeout(speechDebounceTimer);
+        speechDebounceTimer = null;
+      }
+      const textToSubmit = bufferedSpeechText.trim();
+      bufferedSpeechText = '';
+      if (textToSubmit) {
+        document.getElementById('speechInput').value = textToSubmit;
+        submitSpeechString(textToSubmit, 'microphone');
+        updateStageStatus('audio', 'ready', `Transcrito: "${textToSubmit.slice(0, 24)}..."`);
+        logClientEvent(`Fala consolidada enviada (${textToSubmit.split(/\s+/).length} palavras): "${textToSubmit}"`, 'INFO');
+      }
+    }
 
     function logClientEvent(msg, level = 'INFO') {
       console.log(`[Mic] [${level}] ${msg}`);
@@ -815,17 +832,27 @@
           if (event.results[i].isFinal) {
             const cleanText = transcript.trim();
             if (cleanText) {
-              document.getElementById('speechInput').value = cleanText;
-              submitSpeechString(cleanText, 'microphone');
-              updateStageStatus('audio', 'ready', `Transcrito: "${cleanText.slice(0, 24)}..."`);
-              logClientEvent(`Fala finalizada e transcrita: "${cleanText}"`, 'INFO');
+              bufferedSpeechText = bufferedSpeechText ? (bufferedSpeechText + ' ' + cleanText) : cleanText;
+              document.getElementById('speechInput').value = bufferedSpeechText;
+
+              const wordCount = bufferedSpeechText.split(/\s+/).filter(Boolean).length;
+              if (speechDebounceTimer) clearTimeout(speechDebounceTimer);
+
+              // If word count >= 8 words (full clause), flush immediately
+              // Otherwise wait 1.2s of silence so fragments like "separado" coalesce naturally
+              if (wordCount >= 8) {
+                flushBufferedSpeech();
+              } else {
+                speechDebounceTimer = setTimeout(flushBufferedSpeech, 1200);
+              }
             }
           } else {
             interim += transcript;
           }
         }
         if (interim) {
-          document.getElementById('speechInput').placeholder = `Detectando: "${interim.slice(0, 32)}..."`;
+          const displayInterim = bufferedSpeechText ? `${bufferedSpeechText} ${interim}` : interim;
+          document.getElementById('speechInput').placeholder = `Detectando: "${displayInterim.slice(0, 36)}..."`;
         }
       };
 
@@ -907,6 +934,7 @@
     }
 
     function stopMicrophone(isError = false) {
+      flushBufferedSpeech();
       isRecordingVoice = false;
       if (speechRecognizer) {
         try { speechRecognizer.stop(); } catch(e) {}
