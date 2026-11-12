@@ -6,7 +6,8 @@
 [![Architecture: Non--Invention](https://img.shields.io/badge/guardrail-Non--Invention%20Rule-emerald.svg)](skills/text_to_semantic_json/SKILL.md)
 [![CI/CD: In Construction](https://img.shields.io/badge/CI%2FCD-in%20construction-orange.svg)](KNOWN_ISSUES.md#1-automated-cicd-workflow-in-construction)
 
-A local **Real-Time Speech-to-Canvas Reasoning Studio** that listens to user speech, interprets strictly stated facts under the **Non-Invention Rule (Zero Hallucination)**, and dynamically drives an embedded [diagrams.net](https://app.diagrams.net) canvas with auto-reconciled geometry, persistent state, and interactive visual telemetry.
+If you love visually organizing the buckets of ideas coming spontaneously from your brain, you're gonna love this. I personally struggle drawing schemas because the way I thing better is both speaking AND drawing. So...
+This is a local **Real-Time Speech-to-Canvas Reasoning Studio** that listens to user speech, interprets strictly stated facts under the **Non-Invention Rule (Zero Hallucination)**, and dynamically drives an embedded [diagrams.net](https://app.diagrams.net) canvas with auto-reconciled geometry, persistent state, and interactive visual telemetry.
 
 ---
 
@@ -46,7 +47,7 @@ Open **`http://127.0.0.1:8050`** in Google Chrome or Microsoft Edge. Use the **`
 
 ## 🧠 AI Backend: Google Antigravity Subscription
 
-The default backend invokes the official Antigravity CLI (`agy`) in headless mode, reusing cached Google OAuth credentials. This allows the pipeline to consume the quota associated with an active Google AI Pro/Ultra subscription without a separate pay-as-you-go Gemini Developer API key.
+So, since this project started as a personal problem solver, it currently works with the AI backend I had immediately available. The default backend invokes the official Antigravity CLI (`agy`) in headless mode, reusing cached Google OAuth credentials. This allows the pipeline to consume the quota associated with an active Google AI Pro/Ultra subscription without a separate pay-as-you-go Gemini Developer API key. (I mean, I was already paying for it!)
 
 ### One-Time Setup
 1. Ensure the Antigravity CLI (`agy`) is available on `PATH`.
@@ -155,7 +156,7 @@ Every factual entity in the diagram must maintain verifiable provenance:
 
 ---
 
-## 📚 Project Documentation
+## 📚 Documentation - Deepdive the project structure
 
 - [Project Architecture & System Design](file:///docs/ARCHITECTURE.md)
 - [Data Models, Schemas & Protocols](file:///docs/DATA_MODELS_AND_SCHEMAS.md)
