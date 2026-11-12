@@ -10,7 +10,7 @@ If you love visually organizing the buckets of ideas coming spontaneously from y
 
 This is a local **Real-Time Speech-to-Canvas Reasoning Studio** that listens to user speech, extracts strictly asserted facts under the **Non-Invention Rule (Factual Provenance Guardrail)**, and dynamically drives an embedded [diagrams.net](https://app.diagrams.net) canvas with auto-reconciled geometry, persistent state, and interactive visual telemetry.
 
-![Semblance Canvas Real-time Execution Preview](docs/images/pipeline_preview.jpg)
+![Semblance Canvas Real-time Execution Preview](docs/images/studio_realtime_preview.png)
 *Real multi-turn execution: voice/text pipeline ingesting procurement rules into the browser studio, generating visual entity taxonomy (green cylinders for data stores, yellow post-its for side notes, yellow diamond for decision gates, blue cards for workflow steps, persona for stakeholders), clean orthogonal connectors, and persistent session state on an embedded diagrams.net canvas.*
 
 ---
