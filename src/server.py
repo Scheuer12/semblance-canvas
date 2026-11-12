@@ -208,6 +208,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
             msg_type = data.get("type")
 
+            if msg_type == "client_log":
+                c_level = data.get("level", "INFO")
+                c_msg = data.get("message", "")
+                print(f"[Client Browser] [{c_level}] {c_msg}")
+                await broadcast_log(f"[Browser] {c_msg}", level=c_level)
+                continue
+
             if msg_type == "clear_canvas":
                 accumulated_segments.clear()
                 session_state.reset()

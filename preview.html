@@ -750,6 +750,16 @@
     let speechRecognizer = null;
     let isRecordingVoice = false;
 
+    function logClientEvent(msg, level = 'INFO') {
+      console.log(`[Mic] [${level}] ${msg}`);
+      addDevLog(`[Mic] ${msg}`, level);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: 'client_log', level: level, message: msg }));
+        } catch (e) {}
+      }
+    }
+
     function showMicError(msg) {
       const notice = document.getElementById('micErrorNotice');
       const text = document.getElementById('micErrorText');
@@ -767,9 +777,12 @@
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        addDevLog('Web Speech API not supported in this browser. Please use Google Chrome or Microsoft Edge.', 'WARN');
+        const notSupported = 'Web Speech API não suportada neste navegador. Utilize Google Chrome ou Microsoft Edge.';
+        logClientEvent(notSupported, 'WARN');
+        showMicError(notSupported);
         return null;
       }
+
       const rec = new SpeechRecognition();
       rec.continuous = true;
       rec.interimResults = true;
@@ -783,7 +796,16 @@
         document.getElementById('micIcon').textContent = '🔴';
         document.getElementById('micLabel').textContent = 'Ouvindo... (Pausar)';
         updateStageStatus('audio', 'active', 'Capturando fala pelo microfone do navegador...');
-        addDevLog('Microfone ativado para ditado contínuo (pt-BR)', 'INFO');
+        logClientEvent('Microfone conectado e ouvindo continuamente (pt-BR)', 'INFO');
+      };
+
+      rec.onaudiostart = () => {
+        logClientEvent('Dispositivo de áudio capturando fluxo de som...', 'INFO');
+      };
+
+      rec.onspeechstart = () => {
+        logClientEvent('Voz detectada pelo navegador...', 'INFO');
+        document.getElementById('speechInput').placeholder = 'Voz detectada, transcrevendo...';
       };
 
       rec.onresult = (event) => {
@@ -796,7 +818,7 @@
               document.getElementById('speechInput').value = cleanText;
               submitSpeechString(cleanText, 'microphone');
               updateStageStatus('audio', 'ready', `Transcrito: "${cleanText.slice(0, 24)}..."`);
-              addDevLog(`Fala transcrita: "${cleanText}"`, 'INFO');
+              logClientEvent(`Fala finalizada e transcrita: "${cleanText}"`, 'INFO');
             }
           } else {
             interim += transcript;
@@ -808,42 +830,46 @@
       };
 
       rec.onerror = (event) => {
-        console.warn('SpeechRecognition error:', event.error);
+        logClientEvent(`Evento onerror recebido: ${event.error}`, 'WARN');
+
         if (event.error === 'no-speech') {
-          // Period of silence: do not stop recording, let onend restart cleanly
-          addDevLog('Nenhuma fala detectada recentemente. Continuando a ouvir...', 'INFO');
+          // Normal pause in speech, keep listening without dropping
+          logClientEvent('Intervalo de silêncio detectado (sem fala). Mantendo microfone ativo.', 'INFO');
           return;
         }
 
         let friendlyMsg = `⚠️ Erro de microfone: ${event.error}`;
         if (event.error === 'not-allowed') {
-          friendlyMsg = '⚠️ Permissão de microfone bloqueada pelo navegador. Clique no ícone de configurações/cadeado na barra de URL para autorizar o microfone.';
+          friendlyMsg = '⚠️ Permissão de microfone negada. Clique no ícone de configurações/cadeado na barra de URL para autorizar o microfone.';
         } else if (event.error === 'network') {
-          friendlyMsg = '⚠️ Erro de rede ao conectar com o serviço de voz do Google. Verifique sua conexão com a internet.';
+          friendlyMsg = '⚠️ Erro de rede (Google Speech API não conectou). Se estiver no Brave, ative o Google Services em brave://settings. Verifique também a conexão.';
         } else if (event.error === 'audio-capture') {
-          friendlyMsg = '⚠️ Falha na captura de áudio: microfone ocupado por outro aplicativo ou silenciado.';
+          friendlyMsg = '⚠️ Falha de captura de áudio: o microfone pode estar ocupado por outro aplicativo ou silenciado.';
         } else if (event.error === 'aborted') {
           friendlyMsg = '⚠️ Reconhecimento de voz interrompido.';
         }
 
         showMicError(friendlyMsg);
-        addDevLog(friendlyMsg, 'ERROR');
+        logClientEvent(friendlyMsg, 'ERROR');
         updateStageStatus('audio', 'error', friendlyMsg);
         stopMicrophone(true);
       };
 
       rec.onend = () => {
+        logClientEvent(`Evento onend disparado (isRecordingVoice=${isRecordingVoice})`, 'INFO');
         if (isRecordingVoice) {
-          // Restart after 250ms to allow Chrome to release the audio stream
+          // Restart after 200ms to keep continuous listening stable
           setTimeout(() => {
             if (isRecordingVoice && speechRecognizer) {
               try {
                 speechRecognizer.start();
+                logClientEvent('Reconexão automática do microfone bem-sucedida', 'INFO');
               } catch (e) {
-                console.warn('Auto-restart in onend skipped or failed:', e);
+                // If it already started or cannot start, log softly
+                logClientEvent(`Tentativa de reconexão: ${e.message}`, 'WARN');
               }
             }
-          }, 250);
+          }, 200);
         } else {
           stopMicrophone(false);
         }
@@ -854,55 +880,27 @@
 
     function toggleMicrophone() {
       if (isRecordingVoice) {
+        logClientEvent('Usuário solicitou pausa manual do microfone', 'INFO');
         stopMicrophone(false);
         return;
       }
 
       clearMicError();
+      logClientEvent('Usuário clicou para iniciar ditado por microfone', 'INFO');
 
-      // Proactively check/request microphone permission via getUserMedia
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true })
-          .then((stream) => {
-            // Permission confirmed! Stop test track
-            stream.getTracks().forEach(t => t.stop());
-            startRecognitionInternal();
-          })
-          .catch((err) => {
-            let friendlyMsg = '⚠️ Falha ao acessar o microfone.';
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-              friendlyMsg = '⚠️ Permissão de microfone negada. Clique no ícone de cadeado/permissões na barra de endereços (ao lado de http://127.0.0.1:8050) e altere "Microfone" para "Permitir".';
-            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-              friendlyMsg = '⚠️ Nenhum microfone encontrado. Verifique se o microfone está conectado e habilitado no Windows.';
-            } else {
-              friendlyMsg = `⚠️ Erro de hardware no microfone: ${err.message || err.name}`;
-            }
-            showMicError(friendlyMsg);
-            addDevLog(friendlyMsg, 'ERROR');
-            updateStageStatus('audio', 'error', friendlyMsg);
-            stopMicrophone(true);
-          });
-      } else {
-        startRecognitionInternal();
-      }
-    }
-
-    function startRecognitionInternal() {
       if (!speechRecognizer) {
         speechRecognizer = initSpeechRecognition();
       }
-      if (!speechRecognizer) {
-        showMicError('O recurso de reconhecimento de voz por microfone requer Google Chrome ou Microsoft Edge.');
-        return;
-      }
+      if (!speechRecognizer) return;
 
       try {
         isRecordingVoice = true;
         speechRecognizer.start();
+        logClientEvent('speechRecognizer.start() chamado', 'INFO');
       } catch (err) {
-        console.warn('Speech recognition start error:', err);
+        logClientEvent(`Exceção ao chamar speechRecognizer.start(): ${err.message}`, 'ERROR');
         if (err.name !== 'InvalidStateError') {
-          showMicError(`⚠️ Erro ao iniciar reconhecimento: ${err.message || err.name}`);
+          showMicError(`⚠️ Erro ao iniciar: ${err.message}`);
           stopMicrophone(true);
         }
       }
@@ -922,7 +920,6 @@
         updateStageStatus('audio', 'ready', 'Standby / Ready');
         clearMicError();
       }
-      addDevLog('Ditado por microfone pausado.', 'INFO');
     }
 
     function submitSpeechString(text, source = 'manual') {
