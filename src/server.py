@@ -44,6 +44,24 @@ if session_state.load_from_disk(SAVE_FILE):
         print(f"[Server] Error restoring segments: {e}")
 
 
+@app.on_event("startup")
+async def startup_event():
+    # Pre-warm AI daemon in background thread to eliminate first-turn cold start
+    print("[Server] Triggering proactive background AI daemon pre-warming...")
+    loop = asyncio.get_event_loop()
+
+    def _prewarm_task():
+        skill_runner.ai_client.warm_up()
+        model_name = getattr(skill_runner.ai_client, "model", config.ai.model or "gemini-3.8-flash-low")
+        print(f"[Server] Resident AI daemon pre-warmed and ready (model: {model_name})")
+        asyncio.run_coroutine_threadsafe(
+            broadcast_log(f"Resident AI instance pre-warmed & active with system context (model: {model_name})"),
+            loop,
+        )
+
+    loop.run_in_executor(None, _prewarm_task)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
     if preview_file.is_file():
@@ -77,13 +95,39 @@ async def broadcast_log(message: str, level: str = "INFO"):
     })
 
 
-def process_pipeline_sync(segments, status_callback=None):
+def process_pipeline_sync(segments, status_callback=None, log_callback=None, event_callback=None):
     """Processes speech segments through Skill 1 and Skill 2, reconciling persistent state."""
     if status_callback:
         status_callback("semantic", "active", f"Analyzing {len(segments)} segments...")
 
+    def on_skill_log(msg: str, level: str = "INFO"):
+        if log_callback:
+            log_callback(f"[AI] {msg}", level)
+
+    def on_semantic_json(raw_json: dict, error_msg: Optional[str] = None):
+        if event_callback:
+            event_callback({
+                "type": "semantic_json_update",
+                "semantic_json": raw_json,
+                "has_error": bool(error_msg),
+                "error": error_msg,
+            })
+
+    def on_canvas_json(raw_json: dict, error_msg: Optional[str] = None):
+        if event_callback:
+            event_callback({
+                "type": "canvas_json_update",
+                "canvas_json": raw_json,
+                "has_error": bool(error_msg),
+                "error": error_msg,
+            })
+
     print(f"\n[Server] Running Skill 1 (Semantic Extraction)...")
-    semantic_json = skill_runner.run_text_to_semantic(segments)
+    semantic_json = skill_runner.run_text_to_semantic(
+        segments,
+        on_log=on_skill_log,
+        on_semantic_json=on_semantic_json,
+    )
 
     # Reconcile persistent session state with semantic updates & direct deletions
     session_state.sync_from_semantic(semantic_json)
@@ -94,7 +138,11 @@ def process_pipeline_sync(segments, status_callback=None):
     print(f"[Server] Running Skill 2 (Canvas Geometry)...")
     # If active concepts remain, run Skill 2; if everything was deleted, produce empty/cleaned canvas
     if semantic_json.get("concepts"):
-        canvas_json = skill_runner.run_semantic_to_canvas(semantic_json)
+        canvas_json = skill_runner.run_semantic_to_canvas(
+            semantic_json,
+            on_log=on_skill_log,
+            on_canvas_json=on_canvas_json,
+        )
         # Update node geometries into persistent session
         for node in canvas_json.get("nodes", []):
             nid = node.get("id")
@@ -122,6 +170,12 @@ async def websocket_endpoint(websocket: WebSocket):
     active_connections.add(websocket)
     print(f"[Server] Client connected ({len(active_connections)} active)")
     await broadcast_log(f"Browser client connected ({len(active_connections)} active tab)")
+
+    # Broadcast AI backend status and resident daemon readiness to Dev Tab
+    model_name = getattr(skill_runner.ai_client, "model", config.ai.model or "gemini-3.8-flash-low")
+    is_ready = getattr(skill_runner.ai_client, "is_ready", False)
+    ai_status = "active & pre-warmed" if is_ready else "resident daemon initialized"
+    await broadcast_log(f"AI backend initialized ({config.ai.backend}) | Model: {model_name} | Resident daemon: {ai_status}")
 
     # Send initial stage readiness
     for stage_name in ("audio", "semantic", "layout", "canvas"):
@@ -205,9 +259,21 @@ async def websocket_endpoint(websocket: WebSocket):
                         loop,
                     )
 
+                def sync_log_emitter(msg, level="INFO"):
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_log(msg, level=level),
+                        loop,
+                    )
+
+                def sync_event_emitter(event_dict):
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_event(event_dict),
+                        loop,
+                    )
+
                 try:
                     result = await loop.run_in_executor(
-                        None, process_pipeline_sync, accumulated_segments, sync_status_emitter
+                        None, process_pipeline_sync, accumulated_segments, sync_status_emitter, sync_log_emitter, sync_event_emitter
                     )
 
                     await broadcast_event({
@@ -237,12 +303,14 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 except Exception as err:
                     print(f"[Server] Pipeline execution error: {err}")
+                    raw_json = getattr(err, "raw_json", None)
                     await broadcast_event({
                         "type": "pipeline_error",
                         "stage": "semantic",
                         "status": "error",
                         "error": str(err),
                         "details": str(err)[:120],
+                        "semantic_json": raw_json,
                     })
                     await broadcast_log(f"Pipeline error: {err}", level="ERROR")
 

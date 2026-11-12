@@ -98,7 +98,7 @@ The semantic layer operates in two distinct modes:
   3. If validation fails, reject the mutation and log a provenance warning.
 
 ### 3.3 Instruction Packager & Graph IR (Intermediate Representation)
-- Normalizes canvas operations into a deterministic schema (see [DATA_MODELS_AND_SCHEMAS.md](file:///docs/DATA_MODELS_AND_SCHEMAS.md)).
+- Normalizes canvas operations into a deterministic schema (see [DATA_MODELS_AND_SCHEMAS.md](DATA_MODELS_AND_SCHEMAS.md)).
 - Dispatches granular atomic operations:
   - `ADD_NODE`
   - `UPDATE_NODE`
@@ -109,13 +109,10 @@ The semantic layer operates in two distinct modes:
   - `APPLY_TEMPLATE`
 
 ### 3.4 JavaScript Bridge & diagrams.net Embedded Integration
-- **Host Web Application**: A lightweight web application (served locally) housing an embedded `<iframe>` pointing to `https://app.diagrams.net/?embed=1&proto=json&configure=1`.
-- **IFrame Protocol**:
-  - Communication is conducted via `window.postMessage`.
-  - Common diagrams.net message actions utilized:
-    - `load`: Initial diagram XML / mxGraph load.
-    - `merge`: Incrementally merge XML elements into the existing canvas without clearing the document.
-    - `configure`: Disable unwanted UI panels for a distraction-free experience.
+- **Host Web Application**: A lightweight web application (served locally via FastAPI) housing an embedded `<iframe>` pointing to `https://app.diagrams.net/?embed=1&proto=json&spin=1&ui=min`.
+- **IFrame Protocol & The Reverse Path**:
+  - **Forward Path (AI to Canvas)**: Programmatic communication conducted via `window.postMessage`. The bridge dispatches `load` actions containing serialized `mxGraph` XML with deterministic geometries, dynamic container boundaries, and `jumpStyle=arc` connectors.
+  - **Reverse Path (Canvas to AI - In Progress)**: Ingesting manual user interactions back into the reasoning loop. When users reposition cards or adjust arrows directly in the diagrams.net UI, the iframe emits `autosave` postMessage events. A reverse XML parser extracts modified coordinates and labels, synchronizing Python `CanvasSessionState` and providing visual feedback to the AI model on subsequent turns.
 - **Bridge WebSocket Client**:
   - Subscribes to the Python backend's instruction stream.
   - Translates Graph IR payloads into `mxGraph` XML snippets or native diagrams.net actions.
@@ -128,12 +125,12 @@ The semantic layer operates in two distinct modes:
 | Stage | Target Latency | Notes |
 | :--- | :--- | :--- |
 | Audio VAD & Chunking | ~100–300 ms | Triggers after speech silence boundary |
-| Speech-to-Text | ~200–500 ms | Dependent on whisper model size (`tiny.en` / `base.en` / `small.en`) |
-| Semantic Interpretation | ~400–1000 ms | LLM/parser structured output generation |
+| Speech-to-Text | ~200–500 ms | Dependent on whisper model size (`tiny.en` / `base.en` / `small.en`) or Web Speech API |
+| Semantic Interpretation | ~400–1000 ms | LLM structured output generation via persistent resident daemon |
 | Canvas Bridge & Render | ~50–100 ms | WebSocket message delivery and `postMessage` canvas update |
 | **Total Turnaround** | **< 1.5 – 2.0 s** | Near real-time visual feedback loop |
 
-The latency table is a target, not a measured result. The current Antigravity adapter starts a process per model call and has not yet demonstrated the semantic-layer target. A persistent `stream-json` process should be implemented and benchmarked before claiming near-real-time performance.
+The latency table reflects architectural targets. To minimize latency, the Antigravity adapter utilizes a persistent resident `stream-json` daemon process with server-boot pre-warming, eliminating cold-start overhead across multi-turn sessions.
 
 ---
 

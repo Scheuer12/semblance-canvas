@@ -438,7 +438,7 @@
         <div class="dev-tabs-group" onclick="event.stopPropagation()">
           <span style="font-size: 11px; font-weight: 700; color: #cbd5e1; margin-right: 8px;">🛠️ DEV INSPECTOR:</span>
           <button class="dev-tab-btn active" onclick="switchDevTab('logs')">Live Logs <span id="logCount" style="color: #60a5fa;">(0)</span></button>
-          <button class="dev-tab-btn" onclick="switchDevTab('semantic')">Semantic JSON</button>
+          <button class="dev-tab-btn" onclick="switchDevTab('semantic')">Semantic JSON <span id="semanticBadge" style="display: none; margin-left: 3px; font-size: 9px; padding: 1px 4px; border-radius: 3px; background: #ef4444; color: #fff; font-weight: 700;">ERR</span></button>
           <button class="dev-tab-btn" onclick="switchDevTab('canvasJson')">Canvas JSON</button>
           <button class="dev-tab-btn" onclick="switchDevTab('xml')">mxGraph XML</button>
         </div>
@@ -457,6 +457,10 @@
 
         <!-- Tab 2: Semantic JSON -->
         <div id="tab-semantic" class="dev-content-pane">
+          <div id="semanticErrorBanner" style="display: none; background: #450a0a; border: 1px solid #ef4444; color: #fca5a5; padding: 8px 10px; border-radius: 6px; margin-bottom: 8px; font-size: 11px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <strong style="color: #f87171;">⚠️ Schema / Validation Notice</strong>
+            <div id="semanticErrorDesc" style="margin-top: 3px; color: #fecaca; font-family: monospace; font-size: 10.5px;"></div>
+          </div>
           <pre id="semanticViewer" class="code-viewer">// Semantic JSON will be displayed here once pipeline processes speech...</pre>
         </div>
 
@@ -609,6 +613,29 @@
       return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    function renderSemanticJson(jsonData, errorMsg = null) {
+      const viewer = document.getElementById('semanticViewer');
+      const banner = document.getElementById('semanticErrorBanner');
+      const desc = document.getElementById('semanticErrorDesc');
+      const badge = document.getElementById('semanticBadge');
+
+      if (errorMsg) {
+        if (banner) {
+          banner.style.display = 'block';
+          if (desc) desc.textContent = errorMsg;
+        }
+        if (badge) badge.style.display = 'inline-block';
+        const formatted = jsonData ? JSON.stringify(jsonData, null, 2) : '// [No JSON payload generated]';
+        viewer.textContent = `// ⚠️ SCHEMA / PROVENANCE VALIDATION NOTICE:\n// ${errorMsg.replace(/\n/g, '\n// ')}\n// Raw JSON received from AI backend:\n\n${formatted}`;
+      } else {
+        if (banner) banner.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        if (jsonData) {
+          viewer.textContent = JSON.stringify(jsonData, null, 2);
+        }
+      }
+    }
+
     // Connect to WebSocket server
     function connectWs() {
       const loc = window.location;
@@ -630,6 +657,12 @@
             updateStageStatus(data.stage, data.status, data.details);
           } else if (data.type === 'log') {
             addDevLog(data.message, data.level, data.time);
+          } else if (data.type === 'semantic_json_update') {
+            renderSemanticJson(data.semantic_json, data.has_error ? data.error : null);
+          } else if (data.type === 'canvas_json_update') {
+            if (data.canvas_json) {
+              document.getElementById('canvasJsonViewer').textContent = JSON.stringify(data.canvas_json, null, 2);
+            }
           } else if (data.type === 'pipeline_success') {
             // Anti-ghost synchronization: Load full graph so deleted items vanish
             if (data.xml) {
@@ -637,7 +670,7 @@
               sendToDiagram('load', data.xml);
             }
             if (data.semantic_json) {
-              document.getElementById('semanticViewer').textContent = JSON.stringify(data.semantic_json, null, 2);
+              renderSemanticJson(data.semantic_json, null);
             }
             if (data.canvas_json) {
               document.getElementById('canvasJsonViewer').textContent = JSON.stringify(data.canvas_json, null, 2);
@@ -649,6 +682,9 @@
           } else if (data.type === 'pipeline_error') {
             updateStageStatus(data.stage || 'semantic', 'error', data.error);
             addDevLog(`Pipeline failure in [${data.stage}]: ${data.error}`, 'ERROR');
+            if (data.semantic_json) {
+              renderSemanticJson(data.semantic_json, data.error);
+            }
           }
         } catch (e) {
           console.error(e);

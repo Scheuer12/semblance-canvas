@@ -132,14 +132,14 @@ def canvas_json_to_mxgraph_xml(canvas_data: Dict[str, Any]) -> str:
         # Base orthogonal routing with arc jumping to avoid ambiguity on intersecting lines
         jump_opts = "jumpStyle=arc;jumpSize=8;targetPerimeterSpacing=4;sourcePerimeterSpacing=4;"
 
-        if "depend" in rel_type or "depend" in eid.lower():
-            # Dashed indigo line with solid block arrow
+        if any(k in rel_type for k in ("depend", "require", "need")):
+            # Dashed indigo line with solid block arrow (Requirement / Dependency)
             style = f"edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;dashPattern=6 6;strokeColor=#6366F1;strokeWidth=2;endArrow=block;{jump_opts}"
-        elif "cause" in rel_type or "lead" in rel_type or "leads_to" in rel_type:
-            # Solid blue classic arrow
+        elif any(k in rel_type for k in ("cause", "lead", "trigger", "create", "generat", "send", "receiv")):
+            # Solid blue classic arrow (Action / Flow / Transition)
             style = f"edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=classic;{jump_opts}"
-        elif "part_of" in rel_type or "belong" in rel_type:
-            # Emerald line with diamond marker
+        elif any(k in rel_type for k in ("part_of", "belong", "contain")):
+            # Emerald line with diamond marker (Composition / Membership)
             style = f"edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#059669;strokeWidth=2;endArrow=diamond;endFill=1;{jump_opts}"
         elif base_style:
             style = f"{base_style};{jump_opts}"
