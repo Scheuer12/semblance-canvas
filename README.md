@@ -1,41 +1,62 @@
 # Semblance Canvas
 
-A local **Speech-to-Canvas MVP** that listens to user speech, interprets only explicitly stated information with strict factual provenance, and dynamically manipulates an embedded [diagrams.net](https://app.diagrams.net) canvas in near real time.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![Tests: 9 Passing](https://img.shields.io/badge/tests-9%20passing-brightgreen.svg)](tests/)
+[![Architecture: Non--Invention](https://img.shields.io/badge/guardrail-Non--Invention%20Rule-emerald.svg)](skills/text_to_semantic_json/SKILL.md)
+[![CI/CD: In Construction](https://img.shields.io/badge/CI%2FCD-in%20construction-orange.svg)](KNOWN_ISSUES.md#1-automated-cicd-workflow-in-construction)
 
-## AI backend: Google Antigravity subscription
+A local **Real-Time Speech-to-Canvas Reasoning Studio** that listens to user speech, interprets strictly stated facts under the **Non-Invention Rule (Zero Hallucination)**, and dynamically drives an embedded [diagrams.net](https://app.diagrams.net) canvas with auto-reconciled geometry, persistent state, and interactive visual telemetry.
 
-The default backend invokes the official Antigravity CLI in headless mode and reuses its cached Google OAuth credentials. This allows the pipeline to consume the quota associated with a Google AI Pro/Ultra subscription without a Gemini Developer API key.
+---
 
-### One-time setup
+## 📖 Open Source Guidelines & Documentation
 
-1. Install the Antigravity CLI so the `agy` executable is available on `PATH`.
-2. Run `agy` interactively once and sign in with the Google account that owns the subscription.
-3. Exit the interactive session. Subsequent pipeline calls use `agy --print` and the cached OAuth session.
+* 🤝 **Contributing Guide**: See [CONTRIBUTING.md](CONTRIBUTING.md) for local dev setup, coding conventions, and PR workflows.
+* ⚠️ **Known Issues & Technical Debt**: See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for transparent tracking of known limitations, CI/CD roadmap, and open refactors.
+* 📄 **License**: Permissive open-source [MIT License](LICENSE).
+* 🏛️ **System Architecture**: Detailed design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-The default `config.json` uses:
+> [!NOTE]
+> **CI/CD Automation Status**: Automated GitHub Actions workflows for continuous integration and linting are actively in construction and will be published alongside the typed semantic taxonomy milestone. The test suite currently runs locally with a 100% pass rate.
 
-```json
-{
-  "ai": {
-    "backend": "antigravity_cli",
-    "antigravity_cli_path": "agy",
-    "model": "",
-    "cli_timeout_seconds": 60
-  }
-}
+---
+
+## ⚡ Quickstart
+
+### 1. Clone & Install
+```bash
+git clone https://github.com/Scheuer12/semblance-canvas.git
+cd semblance-canvas
+pip install -r requirements.txt
 ```
 
-Leave `model` empty to use the account's current default model. Set it only to an identifier returned by the installed Antigravity CLI. The Antigravity child process deliberately receives neither `GEMINI_API_KEY` nor `GOOGLE_API_KEY`, preventing accidental fallback to separately billed Developer API usage.
+### 2. Run Test Suite
+```bash
+python -m unittest discover -s tests -t .
+```
 
-### Alternative backends
+### 3. Start Bridge Server
+```bash
+python -m src.server --port 8050
+```
+Open **`http://127.0.0.1:8050`** in Google Chrome or Microsoft Edge. Use the **`🎙️ Ditar Voz (Mic)`** button or type in the test input.
 
-- `google_genai`: official Gemini Developer API via `GEMINI_API_KEY`; its billing and quota are separate from Google AI subscriptions.
-- `gemini_cli`: compatibility with the deprecated legacy CLI; not the default.
-- `mock`: deterministic offline backend used by tests.
+---
 
-### Operational Architecture
+## 🧠 AI Backend: Google Antigravity Subscription
 
-The Antigravity backend runs via a persistent resident `stream-json` daemon (`subprocess.Popen` with `CREATE_NO_WINDOW`). The CLI process initializes once at server boot, eliminating per-turn cold-start overhead and maintaining state while consuming the user's active Google AI Pro/Ultra subscription quota.
+The default backend invokes the official Antigravity CLI (`agy`) in headless mode, reusing cached Google OAuth credentials. This allows the pipeline to consume the quota associated with an active Google AI Pro/Ultra subscription without a separate pay-as-you-go Gemini Developer API key.
+
+### One-Time Setup
+1. Ensure the Antigravity CLI (`agy`) is available on `PATH`.
+2. Run `agy` interactively once and sign in with the Google account owning the subscription.
+3. Exit the interactive session. The bridge server uses a persistent resident `stream-json` daemon (`subprocess.Popen` with `CREATE_NO_WINDOW`) for sub-second multi-turn reasoning without cold-start overhead.
+
+### Alternative Backends
+* `google_genai`: Official Gemini Developer API via `GEMINI_API_KEY`.
+* `gemini_cli`: Compatibility adapter for the legacy CLI.
+* `mock`: Deterministic offline backend used by unit tests.
 
 ---
 
