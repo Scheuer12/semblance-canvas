@@ -81,12 +81,12 @@ flowchart LR
 ---
 
 ## Phase 4: Mode A & Mode B Feature Completion
-> **Objective**: Refine visual layout heuristics, deterministic De-Para, and stream debouncing.
+> **Objective**: Refine visual layout heuristics, deterministic shape mapping, and stream debouncing.
 
 ### Tasks:
-1. **Deterministic Layout & Visual De-Para Engine**:
+1. **Deterministic Layout & Visual Type Mapping Engine**:
    - [x] Implement sub-5ms Python layout engine replacing secondary LLM layout call.
-   - [x] Visual De-Para mapping: `process_step` (blue card), `side_annotation` (dashed post-it), `data_store` (green cylinder), `decision_gate` (yellow diamond), `actor` (persona).
+   - [x] Visual entity type mapping: `process_step` (blue card), `side_annotation` (dashed post-it), `data_store` (green cylinder), `decision_gate` (yellow diamond), `actor` (persona).
    - [x] Dynamic container bounding box calculation with multi-cluster wrap-around.
 2. **Speech Debounce & Queue Coalescing**:
    - [x] Implement 8-word / 1.2s silence debounce in browser to prevent single-word fragment turns.

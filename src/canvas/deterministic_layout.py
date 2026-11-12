@@ -1,10 +1,10 @@
-"""Deterministic Layout and Semantic De-Para Engine for Semblance Canvas.
+"""Deterministic Layout and Semantic Type Mapping Engine for Semblance Canvas.
 
 Translates logical semantic JSON (Skill 1) into a visually structured Canvas JSON
 in < 5ms without requiring a secondary LLM generation pass.
 
 Features:
-- De-Para Semantic Mapping:
+- Semantic Entity Type Mapping:
   - process_step  -> Rounded blue card (Operational Action / Workflow stage)
   - side_annotation -> Dashed yellow sticky note (Informational note / Caveat)
   - data_store    -> Green cylinder (Spreadsheet / DB / Physical archive)
@@ -22,8 +22,8 @@ import copy
 from typing import Any, Dict, List
 
 
-# Semantic Type -> Visual Style and Dimension De-Para Mapping
-DE_PARA_STYLES: Dict[str, Dict[str, Any]] = {
+# Semantic Type -> Visual Style and Dimension Mapping
+SEMANTIC_TYPE_STYLES: Dict[str, Dict[str, Any]] = {
     "process_step": {
         "style": "rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontColor=#1E3A8A;fontStyle=1;arcSize=14;fontSize=12;",
         "width": 180,
@@ -68,9 +68,9 @@ CLUSTER_PALETTES = [
 
 
 def resolve_semantic_type(concept: Dict[str, Any]) -> str:
-    """Infers or validates the semantic entity type for graphical de-para."""
+    """Infers or validates the semantic entity type for graphical type mapping."""
     raw_type = (concept.get("type") or "concept").lower().strip()
-    if raw_type in DE_PARA_STYLES:
+    if raw_type in SEMANTIC_TYPE_STYLES:
         return raw_type
 
     label = (concept.get("label") or "").lower()
@@ -139,18 +139,18 @@ def compute_deterministic_canvas_layout(semantic_data: Dict[str, Any]) -> Dict[s
 
         for m_idx, node in enumerate(members):
             s_type = resolve_semantic_type(node)
-            de_para = DE_PARA_STYLES[s_type]
+            type_style = SEMANTIC_TYPE_STYLES[s_type]
 
             col = m_idx % cols_per_row
             row = m_idx // cols_per_row
 
             gx = c_min_x + (col * col_spacing)
             gy = c_min_y + (row * row_spacing)
-            gw = de_para["width"]
-            gh = de_para["height"]
+            gw = type_style["width"]
+            gh = type_style["height"]
 
             node["type"] = s_type
-            node["style"] = de_para["style"]
+            node["style"] = type_style["style"]
             node["geometry"] = {"x": gx, "y": gy, "width": gw, "height": gh}
             layout_nodes.append(node)
             member_bounds.append((gx, gy, gw, gh))
@@ -200,15 +200,15 @@ def compute_deterministic_canvas_layout(semantic_data: Dict[str, Any]) -> Dict[s
 
         for u_idx, node in enumerate(unclustered_nodes):
             s_type = resolve_semantic_type(node)
-            de_para = DE_PARA_STYLES[s_type]
+            type_style = SEMANTIC_TYPE_STYLES[s_type]
 
             node["type"] = s_type
-            node["style"] = de_para["style"]
+            node["style"] = type_style["style"]
             node["geometry"] = {
                 "x": unclustered_x + (u_idx * 210),
                 "y": unclustered_y,
-                "width": de_para["width"],
-                "height": de_para["height"],
+                "width": type_style["width"],
+                "height": type_style["height"],
             }
             layout_nodes.append(node)
 
@@ -228,7 +228,7 @@ def compute_deterministic_canvas_layout(semantic_data: Dict[str, Any]) -> Dict[s
 
     return {
         "canvas_metadata": {
-            "layout_style": "deterministic_de_para",
+            "layout_style": "deterministic_type_mapping",
             "canvas_width": 1600,
             "canvas_height": 1200,
         },

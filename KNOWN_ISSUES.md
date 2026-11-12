@@ -8,7 +8,7 @@ This document tracks known architectural limitations, edge cases, and in-progres
 
 ### 1. Automated CI/CD Workflow (In Construction)
 * **Severity**: Low (Development Infrastructure)
-* **Current State**: The project maintains a complete offline test suite (10 unit tests validating schemas, Non-Invention invariants, state mutations, deterministic layout de-para, and geometry stabilization) which currently runs locally via `python -m unittest discover tests`.
+* **Current State**: The project maintains a complete offline test suite (10 unit tests validating schemas, Non-Invention invariants, state mutations, deterministic layout type mapping, and geometry stabilization) which currently runs locally via `python -m unittest discover tests`.
 * **Planned Resolution**: An automated GitHub Actions CI/CD pipeline (covering multi-platform testing on Ubuntu/Windows/macOS, Flake8 linting, and JSON schema verification) is actively in construction.  
   * **Milestone**: It will be deployed following the completion of the pre-publication validation suite.
 
@@ -64,7 +64,7 @@ This document tracks known architectural limitations, edge cases, and in-progres
 
 ## ✅ Recently Resolved & Landed Optimizations
 
-### Landed: Enhanced Semantic Differentiation & Deterministic "De-Para" Engine
+### Landed: Enhanced Semantic Differentiation & Deterministic Type Mapping Engine
 * **Status**: Completed (`src/canvas/deterministic_layout.py`)
 * **Impact**: Eliminated the secondary 25-second LLM layout call (Skill 2) from the critical loop. Geometry and visual typing are now calculated in **< 5ms** directly in Python:
   * ⚙️ `process_step` ➔ Rounded blue card (Operational Action)

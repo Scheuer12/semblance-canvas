@@ -79,7 +79,7 @@ class TestLayoutGeometryStabilization(unittest.TestCase):
         self.assertIn("jumpStyle=arc", xml)
         self.assertIn("jumpSize=8", xml)
 
-    def test_deterministic_de_para_layout(self):
+    def test_deterministic_semantic_layout(self):
         from src.canvas.deterministic_layout import compute_deterministic_canvas_layout
 
         semantic_data = {
@@ -100,7 +100,7 @@ class TestLayoutGeometryStabilization(unittest.TestCase):
         self.assertEqual(len(canvas_json["visual_clusters"]), 1)
 
         nodes = {n["id"]: n for n in canvas_json["nodes"]}
-        # Verify De-Para styling
+        # Verify typed entity visual styling
         self.assertIn("fillColor=#DBEAFE", nodes["step1"]["style"])
         self.assertIn("shape=note", nodes["note1"]["style"])
         self.assertIn("shape=cylinder3", nodes["db1"]["style"])

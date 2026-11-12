@@ -96,7 +96,7 @@ async def broadcast_log(message: str, level: str = "INFO"):
 
 
 def process_pipeline_sync(segments, status_callback=None, log_callback=None, event_callback=None):
-    """Processes speech segments through Skill 1 and deterministic visual De-Para, reconciling persistent state."""
+    """Processes speech segments through Skill 1 and deterministic visual type mapping, reconciling persistent state."""
     if status_callback:
         status_callback("semantic", "active", f"Analyzing {len(segments)} segments...")
 
@@ -133,9 +133,9 @@ def process_pipeline_sync(segments, status_callback=None, log_callback=None, eve
     session_state.sync_from_semantic(semantic_json)
 
     if status_callback:
-        status_callback("layout", "active", "Applying deterministic layout & visual De-Para (< 5ms)...")
+        status_callback("layout", "active", "Applying deterministic layout & visual type mapping (< 5ms)...")
 
-    print(f"[Server] Computing Deterministic Layout & Visual De-Para...")
+    print(f"[Server] Computing Deterministic Layout & Visual Type Mapping...")
     # Compute visual layout deterministically in Python in 2ms without secondary LLM call
     canvas_json = compute_deterministic_canvas_layout(semantic_json)
 

@@ -11,7 +11,7 @@ If you love visually organizing the buckets of ideas coming spontaneously from y
 This is a local **Real-Time Speech-to-Canvas Reasoning Studio** that listens to user speech, extracts strictly asserted facts under the **Non-Invention Rule (Factual Provenance Guardrail)**, and dynamically drives an embedded [diagrams.net](https://app.diagrams.net) canvas with auto-reconciled geometry, persistent state, and interactive visual telemetry.
 
 ![Semblance Canvas Real-time Execution Preview](docs/images/pipeline_preview.jpg)
-*Real multi-turn execution: voice/text pipeline ingesting procurement rules into the browser studio, generating visual "De-Para" taxonomy (green cylinders for data stores, yellow post-its for side notes, yellow diamond for decision gates, blue cards for workflow steps), dynamic swimlanes, and persistent session state on an embedded diagrams.net canvas.*
+*Real multi-turn execution: voice/text pipeline ingesting procurement rules into the browser studio, generating visual entity taxonomy (green cylinders for data stores, yellow post-its for side notes, yellow diamond for decision gates, blue cards for workflow steps, persona for stakeholders), clean orthogonal connectors, and persistent session state on an embedded diagrams.net canvas.*
 
 ---
 
@@ -74,9 +74,9 @@ So, since this project started as a personal problem solver, it currently works 
 ## ✨ Implemented Core Capabilities
 
 1. **Strict Provenance & Non-Invention Guardrail**: Every concept node and relationship edge must trace back to explicit transcript segments (`source_ids`). Unsupported relationships are strictly rejected.
-2. **Deterministic Layout & Visual "De-Para" Engine (`deterministic_layout.py`)**:
+2. **Deterministic Layout & Visual Type Mapping Engine (`deterministic_layout.py`)**:
    * **Sub-5ms Execution**: Replaced the secondary 25-second LLM layout step with a deterministic Python engine calculating horizontal flows, coordinates, and container geometries in `< 5ms`.
-   * **Visual Entity "De-Para" Taxonomy**: Maps semantic types directly to distinct diagrams.net shapes and colors:
+   * **Visual Entity Taxonomy Mapping**: Maps semantic types directly to distinct diagrams.net shapes and colors:
      * ⚙️ `process_step` ➔ Rounded blue card (Operational Action)
      * 📝 `side_annotation` ➔ Yellow dashed sticky note (Observations / Caveats)
      * 🗄️ `data_store` ➔ Green cylinder (Databases, Spreadsheets, WhatsApp groups)
@@ -136,7 +136,7 @@ For full technical specifications and active issue tracking, refer to [`KNOWN_IS
          │ Semantic JSON IR (Concepts, Typed Entities, Explicit Edges)
          ▼
 ┌─────────────────────────┐
-│ Deterministic Layout &  │ (Deterministic Visual "De-Para" Engine < 5ms)
+│ Deterministic Layout &  │ (Deterministic Visual Type Mapping Engine < 5ms)
 │  mxGraph Serializer     │ [Entity Taxonomy, Dynamic Swimlanes, Arc Jumps]
 └────────┬────────────────┘
          │ mxGraph Model XML
@@ -187,4 +187,4 @@ Every factual entity in the diagram must maintain verifiable provenance:
 ---
 
 ## ⚡ Current Status
-The Python real-time bridge server (`src.server`), persistent headless `agy` CLI daemon (`stream-json`), diagrams.net embedded iframe, non-invention verification suite, deterministic layout engine (< 5ms), typed entity De-Para taxonomy, client-server speech coalescing, intelligent 4-stage pipeline semáforo, interactive Dev Tab inspector, and session-state deletion lifecycle are fully implemented and running locally with a 100% offline test pass rate (10/10 tests passing).
+The Python real-time bridge server (`src.server`), persistent headless `agy` CLI daemon (`stream-json`), diagrams.net embedded iframe, non-invention verification suite, deterministic layout engine (< 5ms), typed entity shape taxonomy, client-server speech coalescing, intelligent 4-stage pipeline semáforo, interactive Dev Tab inspector, and session-state deletion lifecycle are fully implemented and running locally with a 100% offline test pass rate (10/10 tests passing).

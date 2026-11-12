@@ -43,7 +43,7 @@ Analyze transcribed speech segments from the user, determine whether the input r
     ```
   - **Template Scaffolding**: When a recognized framework (like Ishikawa / Fishbone) is requested, standard structural categories (e.g., Man, Machine, Method, Material, Measurement, Environment) may be generated as `template_scaffolding`, but leaves/causes remain empty placeholders unless explicitly supplied.
 
-### 4. Semantic Entity Typing (The Visual De-Para)
+### 4. Semantic Entity Typing (Visual Taxonomy Mapping)
 When extracting concepts into `concepts`, classify each entity's `type` according to its true operational role:
 - `process_step`: Active operational tasks, workflow phases, or transitions (*"verificar escopo"*, *"gerar ordem de compra"*, *"executar compras"*).
 - `side_annotation`: Contextual notes, observations, caveats, or constraints (*"formulário ainda não existe, será criado"*, *"imprevistos durante a execução"*).

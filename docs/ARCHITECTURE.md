@@ -108,9 +108,9 @@ The semantic layer operates in two distinct modes:
   - `MOVE_NODE` / `CLUSTER_NODES`
   - `APPLY_TEMPLATE`
 
-### 3.3.1 Deterministic Layout & Visual "De-Para" Engine (`deterministic_layout.py`)
+### 3.3.1 Deterministic Layout & Visual Type Mapping Engine (`deterministic_layout.py`)
 - **Sub-5ms Geometric Layout**: To eliminate the latency bottleneck of calling a second LLM pass (Skill 2: ~20-25s), layout calculations and coordinates are executed deterministically in Python in **< 5ms**.
-- **Entity Type De-Para**:
+- **Entity Visual Type Mapping**:
   - `process_step` ➔ Blue rounded card (Operational Workflow)
   - `side_annotation` ➔ Yellow dashed sticky note (Observations, Caveats)
   - `data_store` ➔ Green cylinder (Databases, Spreadsheets, WhatsApp groups)

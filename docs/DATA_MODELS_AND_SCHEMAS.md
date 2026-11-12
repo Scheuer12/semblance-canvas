@@ -75,7 +75,7 @@ Represents an individual visual entity on the canvas.
         "template_branch",
         "placeholder"
       ],
-      "description": "Classification of the node determining its visual geometry and De-Para styling"
+      "description": "Classification of the node determining its visual geometry and shape styling"
     },
     "source_ids": {
       "type": "array",
