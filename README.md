@@ -55,7 +55,7 @@ Open **`http://127.0.0.1:8050`** in Google Chrome or Microsoft Edge. Use the **`
 
 ## 🧠 AI Backend: Google Antigravity Subscription
 
-The default backend invokes the official Antigravity CLI (`agy`) in headless mode, reusing cached Google OAuth credentials. This allows the pipeline to consume the quota associated with an active Google AI Pro/Ultra subscription without a separate pay-as-you-go Gemini Developer API key.
+So, since this project started as a personal problem solver, it currently works with the AI backend I had immediately available. The default backend invokes the official Antigravity CLI (`agy`) in headless mode, reusing cached Google OAuth credentials. This allows the pipeline to consume the quota associated with an active Google AI Pro/Ultra subscription without a separate pay-as-you-go Gemini Developer API key. (I mean, I was already paying for it!)
 
 ### One-Time Setup
 1. Ensure the Antigravity CLI (`agy`) is available on `PATH`.
@@ -135,3 +135,80 @@ For full technical specifications and active issue tracking, refer to [`KNOWN_IS
 │ diagrams.net (Embedded) │ [Interactive, Fully Editable Visual Canvas]
 └─────────────────────────┘
 ```
+
+---
+
+## 🔄 Two Core Processing Modes
+
+### Mode A: Ideas Design
+- **Objective**: Ingest user thoughts, identify explicit concepts, and place them on the canvas.
+- **Visual Spatial Proximity vs. Relationships**:
+  - Concepts sharing semantic context may be positioned close to each other.
+  - **No edge (dependency, causality, hierarchy, sequence, or ownership) is created unless explicitly spoken by the user.**
+- **Provenance**: Every node and relationship links back to its exact transcript source IDs (`source_ids`).
+
+### Mode B: Diagram Direction
+- **Objective**: Execute direct structural or layout instructions (e.g., *"Put these closer"*, *"X depends on Y"*, *"Create an Ishikawa for this problem"*).
+- **Templates & Standards**: Recognized frameworks (e.g., Ishikawa 6M: *Man, Machine, Method, Material, Measurement, Mother Nature*) may supply structural scaffolding labels, but leaves/causes remain empty placeholders unless explicitly provided by the user.
+
+---
+
+## 🚫 The Non-Invention Rule
+
+Every factual entity in the diagram must maintain verifiable provenance:
+- **Concept Node**: Must track the `source_ids` from which it was extracted.
+- **Relationship Edge**: Must track the `source_ids` asserting the connection. If unsupported, the relationship is forbidden.
+
+---
+
+## 📚 Documentation - Deepdive the project structure
+
+- [Project Architecture & System Design](file:///docs/ARCHITECTURE.md)
+- [Data Models, Schemas & Protocols](file:///docs/DATA_MODELS_AND_SCHEMAS.md)
+- [Implementation Roadmap & Milestones](file:///docs/ROADMAP.md)
+
+---
+
+## ⚡ Current Status
+The Python real-time bridge server (`src.server`), persistent headless `agy` CLI daemon (`stream-json`), diagrams.net embedded iframe, non-invention verification suite, intelligent 4-stage pipeline semáforo, interactive Dev Tab inspector, and session-state deletion lifecycle are fully implemented and running locally.
+
+---
+
+## 🎯 Next Steps & Architecture Roadmap
+
+### 1. Hybrid Deterministic Compilation vs. LLM Spatial Reasoning
+- **Core Principle**: Reserve the LLM strictly for natural language comprehension and semantic entity extraction; delegate geometry, coordinates ($x, y$), padding, container wrapping, and mxGraph XML generation to **deterministic Python layout algorithms** (DAG topological sort, grid packing, swimlane partitioning).
+- **Benefit**: Drastically reduces token usage, eliminates LLM spatial drift, prevents card overlapping, and cuts pipeline latency by more than 50%.
+
+### 2. Semantic Taxonomy & Entity Discrimination
+Refine Skill 1 (`text_to_semantic_json`) to categorize spoken entities into a formal typed taxonomy:
+- 👤 **Actor / Role**: External actors, human roles, internal departments, or client apps.
+- ⚙️ **Process Step / Action**: Discrete operational tasks or state transitions.
+- 🗄️ **Data Source / Store**: Relational databases, object storage, caches, or messaging queues.
+- 📝 **Annotation / Side Note**: Non-flow remarks, constraints, or metadata attached by proximity.
+- 🔀 **Decision Gateway**: Branching conditions (*if/else*, approval gates).
+*Note: Because skills are loaded once into persistent session memory, enriching the JSON Schema with typed enums and short one-line docstrings maintains sub-second inference speeds without prompt bloat.*
+
+### 3. Proactive Daemon Pre-warming (Zero Starting Delay)
+- **Problem**: When a session first spawns, the initial turn incurs a warm-up handshake cost (~2–3s) while the CLI daemon registers the schema.
+- **Solution**: Trigger a background pre-warming turn as soon as `src.server` boots or when `preview.html` opens. When the user speaks or types their first phrase, the resident daemon is already primed, guaranteeing instant sub-second response from turn 1.
+
+### 4. Single-Pass Consolidated Pipeline (Evaluation)
+- Run offline benchmark tests comparing the 2-step pipeline (Semantic -> Canvas) against a single-pass unified prompt with Chain-of-Thought to evaluate latency gains while strictly verifying that the **Non-Invention Rule** is not compromised by premature geometric assumptions.
+
+### 5. Global Semantic Re-scoping & Granularity Refactoring
+- **Context**: During multi-turn voice dictation, a cluster created in turn 1 (e.g., *"Purchasing Process"*) may later be discovered to represent only an initial sub-phase once subsequent turns detail downstream stages (Approval, Execution, Warehouse Verification).
+- **Architecture Goal**: Introduce an automatic scope-refactoring heuristic in the semantic engine. When new clusters are topologically downstream or subsidiary to an existing container, the engine either:
+  1. Re-labels the original cluster to its specific sub-phase (e.g., *"Requisition / Initial Issuance"*), or
+  2. Wraps all subsidiary clusters into a higher-order macro-swimlane (Enterprise Scope).
+
+### 6. Mixed-Intent Utterance Disambiguation (Mode A vs Mode B)
+- Support mixed natural speech where domain descriptions interleave with direct screen commands (e.g., *"Also, move the approval spreadsheet closer to purchasing, and add a note saying this happens only on Tuesdays"*).
+- The semantic layer splits the utterance into an atomic factual assertion (`concepts`/`relationships`) and an imperative screen mutation (`direct_actions`).
+
+### 7. Dual-Layer Local Session Persistence (Implemented)
+- **Problem Solved**: Page refreshes or temporary disconnections previously cleared the visual canvas.
+- **Implementation**:
+  - **Backend**: Auto-persists the entire session graph, action history, and transcript segments to `data/session_state.json` upon every successful pipeline turn.
+  - **Frontend**: Mirrors active mxGraph XML in browser `localStorage`.
+  - **Reconnection Handshake**: On browser reloads or WebSocket reconnects, the server and client automatically restore the diagram state seamlessly.
