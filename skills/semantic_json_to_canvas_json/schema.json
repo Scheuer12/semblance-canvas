@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CanvasJsonOutput",
+  "type": "object",
+  "properties": {
+    "canvas_metadata": {
+      "type": "object",
+      "properties": {
+        "layout_style": {
+          "type": "string",
+          "enum": ["clustered_freeform", "horizontal_flow", "vertical_hierarchy", "ishikawa_fishbone", "mindmap_radial"]
+        },
+        "canvas_width": { "type": "number" },
+        "canvas_height": { "type": "number" }
+      },
+      "required": ["layout_style"]
+    },
+    "visual_clusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "bounds": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            },
+            "required": ["x", "y", "width", "height"]
+          },
+          "style": { "type": "string" }
+        },
+        "required": ["id", "label", "bounds"]
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "type": { "type": "string" },
+          "cluster_id": { "type": ["string", "null"] },
+          "geometry": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            },
+            "required": ["x", "y", "width", "height"]
+          },
+          "style": {
+            "type": "string",
+            "description": "mxGraph style string for diagrams.net"
+          },
+          "source_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["id", "label", "geometry", "source_ids"]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "label": { "type": "string" },
+          "style": { "type": "string" },
+          "directed": { "type": "boolean", "default": true },
+          "source_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          }
+        },
+        "required": ["id", "source", "target", "source_ids"]
+      }
+    }
+  },
+  "required": ["canvas_metadata", "nodes", "edges"]
+}

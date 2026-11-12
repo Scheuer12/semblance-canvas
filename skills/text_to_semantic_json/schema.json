@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SemanticJsonOutput",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["mode_a_ideas", "mode_b_direction"],
+      "description": "Whether the user input represents ideas/facts (mode_a) or direct canvas modification instructions (mode_b)."
+    },
+    "template": {
+      "type": ["string", "null"],
+      "description": "Optional diagram template requested in Mode B (e.g., 'ishikawa_6m', 'mindmap', 'flowchart', 'venn', null)."
+    },
+    "clusters": {
+      "type": "array",
+      "description": "Semantic groupings or themes derived from topical similarity. Does NOT imply a formal edge.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "theme": { "type": "string" }
+        },
+        "required": ["id", "label"]
+      }
+    },
+    "concepts": {
+      "type": "array",
+      "description": "Explicit concepts, facts, or entities mentioned in the speech.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["concept", "process_step", "cluster_container", "template_scaffolding", "placeholder"]
+          },
+          "cluster_id": { "type": ["string", "null"] },
+          "source_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Transcript segment IDs justifying this concept. Scaffolding may have empty array."
+          },
+          "notes": { "type": "string" }
+        },
+        "required": ["id", "label", "type", "source_ids"]
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "description": "Explicit relationships between concepts. Must NEVER be created purely from similarity.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "relation_type": {
+            "type": "string",
+            "enum": ["depends_on", "causes", "leads_to", "part_of", "sequence_after", "references", "belongs_to_branch"]
+          },
+          "label": { "type": "string" },
+          "directed": { "type": "boolean", "default": true },
+          "source_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "Transcript segment IDs explicitly stating this relationship. REQUIRED."
+          }
+        },
+        "required": ["id", "source", "target", "relation_type", "source_ids"]
+      }
+    },
+    "direct_actions": {
+      "type": "array",
+      "description": "Direct layout or manipulation instructions when in Mode B.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["move", "group", "align", "create_template", "delete"] },
+          "target_ids": { "type": "array", "items": { "type": "string" } },
+          "parameters": { "type": "object" }
+        },
+        "required": ["action", "target_ids"]
+      }
+    }
+  },
+  "required": ["mode", "concepts", "relationships"]
+}

@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Semblance Canvas - Visual Preview</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { display: flex; height: 100vh; overflow: hidden; background: #18181b; color: #f4f4f5; }
+    
+    /* Layout */
+    #sidebar {
+      width: 400px;
+      min-width: 380px;
+      max-width: 420px;
+      background: #27272a;
+      border-right: 1px solid #3f3f46;
+      display: flex;
+      flex-direction: column;
+      padding: 18px 16px;
+      gap: 14px;
+      z-index: 20;
+      overflow-y: auto;
+      overflow-x: hidden; /* Prevent horizontal scrollbars */
+    }
+    
+    #mainArea {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #canvasContainer {
+      flex: 1;
+      position: relative;
+      background: #ffffff;
+    }
+    
+    iframe { width: 100%; height: 100%; border: none; }
+
+    /* Typography & Badges */
+    h1 { font-size: 17px; color: #60a5fa; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #3b82f6; color: #fff; font-weight: 700; text-transform: uppercase; }
+    p.desc { font-size: 12px; color: #a1a1aa; line-height: 1.45; }
+    .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; margin-top: 2px; font-weight: 700; }
+
+    /* Pipeline Semáforo */
+    .semaforo-container {
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .semaforo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .semaforo-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      width: 100%;
+    }
+    .semaforo-stage {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      padding: 8px 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .semaforo-stage:hover, .semaforo-stage.inspecting {
+      border-color: #60a5fa;
+      background: #323238;
+    }
+    .semaforo-stage .stage-icon { font-size: 15px; }
+    .semaforo-stage .stage-name { font-size: 10px; font-weight: 600; color: #cbd5e1; text-align: center; line-height: 1.2; }
+    
+    /* Indicator Dots & Spinners */
+    .indicator-box {
+      width: 14px;
+      height: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dot-ready {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 6px #10b981aa;
+    }
+    .dot-disconnected {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+    .dot-spinner {
+      width: 10px;
+      height: 10px;
+      border: 2px solid rgba(59, 130, 246, 0.3);
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .dot-error {
+      width: 10px;
+      height: 10px;
+      border: 2px solid #ef4444;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444cc;
+      animation: none;
+    }
+    .semaforo-stage.has-error {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.15);
+    }
+    .semaforo-stage.is-active {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.15);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Integrated Diagnostic Status Panel (Zero Overflows, Perfect Margin Respect) */
+    .diagnostic-panel {
+      background: #202024;
+      border: 1px solid #383842;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.35;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .diag-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+    .diag-title {
+      font-weight: 700;
+      color: #60a5fa;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .diag-status-badge {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .diag-status-ready { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .diag-status-active { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .diag-status-error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .diag-detail { color: #d4d4d8; font-size: 11px; word-break: break-word; }
+    .diag-hint { color: #71717a; font-size: 10px; margin-top: 1px; }
+
+    /* Forms & Buttons */
+    .btn-mic {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      background: #27272a;
+      border: 1px solid #52525b;
+      border-radius: 6px;
+      color: #e4e4e7;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-mic:hover {
+      background: #3f3f46;
+      border-color: #60a5fa;
+    }
+    .btn-mic.recording {
+      background: #dc2626 !important;
+      border-color: #ef4444 !important;
+      color: #fff !important;
+      animation: pulse-red 1.2s infinite;
+    }
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .speech-form { display: flex; gap: 8px; width: 100%; }
+    .speech-form input { flex: 1; }
+    .speech-form button { white-space: nowrap; }
+
+    button {
+      padding: 9px 12px;
+      border: 1px solid #4b5563;
+      border-radius: 6px;
+      background: #374151;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover { background: #4b5563; border-color: #60a5fa; }
+    button.primary { background: #2563eb; border-color: #3b82f6; }
+    button.primary:hover { background: #1d4ed8; }
+
+    .input-box {
+      width: 100%;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      color: #e4e4e7;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 9px 10px;
+      box-sizing: border-box;
+    }
+    textarea.input-box {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+      resize: vertical;
+      height: 85px;
+    }
+
+    /* Dev Tab Drawer */
+    #devDrawer {
+      background: #18181b;
+      border-top: 1px solid #3f3f46;
+      display: flex;
+      flex-direction: column;
+      transition: height 0.25s ease;
+      height: 38px; /* Collapsed */
+      z-index: 30;
+      width: 100%;
+    }
+    #devDrawer.expanded {
+      height: 300px;
+    }
+    .dev-drawer-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      background: #27272a;
+      cursor: pointer;
+      user-select: none;
+      height: 38px;
+    }
+    .dev-tabs-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dev-tab-btn {
+      padding: 4px 10px;
+      font-size: 11px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: #a1a1aa;
+      cursor: pointer;
+    }
+    .dev-tab-btn:hover { color: #f4f4f5; background: #3f3f46; }
+    .dev-tab-btn.active {
+      color: #60a5fa;
+      background: #1e1e24;
+      border-color: #3b82f6;
+      font-weight: 600;
+    }
+    .dev-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #121214;
+      padding: 8px 12px;
+      position: relative;
+    }
+    .dev-content-pane {
+      display: none;
+      flex: 1;
+      height: 100%;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #e4e4e7;
+    }
+    .dev-content-pane.active { display: block; }
+    
+    /* Log Entries */
+    .log-entry { margin-bottom: 3px; word-break: break-all; }
+    .log-time { color: #38bdf8; margin-right: 6px; }
+    .log-level-INFO { color: #34d399; font-weight: 600; margin-right: 6px; }
+    .log-level-ERROR { color: #f87171; font-weight: 600; margin-right: 6px; }
+    .log-level-WARN { color: #fbbf24; font-weight: 600; margin-right: 6px; }
+    pre.code-viewer {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 18px;
+      background: #27272a;
+      border: 1px solid #52525b;
+      padding: 4px 8px;
+      font-size: 10px;
+      border-radius: 4px;
+      color: #cbd5e1;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #3f3f46; color: #fff; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h1>Semblance Canvas <span class="badge">MVP</span></h1>
+    <p class="desc">Real-time speech semantic reasoning bridge into diagrams.net.</p>
+
+    <!-- Pipeline Semáforo -->
+    <div class="semaforo-container">
+      <div class="semaforo-header">
+        <span>Pipeline Semáforo</span>
+        <span id="overallStatus" style="color: #34d399; font-size: 10px;">● CONNECTED</span>
+      </div>
+      
+      <div class="semaforo-grid">
+        <!-- Stage 1: Audio Ingestion -->
+        <div id="stage-audio" class="semaforo-stage" onmouseenter="inspectStage('audio')" onmouseleave="resetInspection()">
+          <div class="stage-icon">🎙️</div>
+          <div class="stage-name">Audio Ingestion</div>
+          <div class="indicator-box">
+            <div id="dot-audio" class="dot-ready"></div>
+          </div>
+        </div>
+
+        <!-- Stage 2: Semantic Engine -->
+        <div id="stage-semantic" class="semaforo-stage" onmouseenter="inspectStage('semantic')" onmouseleave="resetInspection()">
+          <div class="stage-icon">🧠</div>
+          <div class="stage-name">Semantic Engine</div>
+          <div class="indicator-box">
+            <div id="dot-semantic" class="dot-ready"></div>
+          </div>
+        </div>
+
+        <!-- Stage 3: Canvas Layout -->
+        <div id="stage-layout" class="semaforo-stage" onmouseenter="inspectStage('layout')" onmouseleave="resetInspection()">
+          <div class="stage-icon">📐</div>
+          <div class="stage-name">Canvas Layout</div>
+          <div class="indicator-box">
+            <div id="dot-layout" class="dot-ready"></div>
+          </div>
+        </div>
+
+        <!-- Stage 4: Diagrams.net Bridge -->
+        <div id="stage-canvas" class="semaforo-stage" onmouseenter="inspectStage('canvas')" onmouseleave="resetInspection()">
+          <div class="stage-icon">🎨</div>
+          <div class="stage-name">Diagrams Bridge</div>
+          <div class="indicator-box">
+            <div id="dot-canvas" class="dot-ready"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integrated Diagnostic Panel (Zero Horizontal Overflow) -->
+      <div class="diagnostic-panel" id="diagPanel">
+        <div class="diag-title-row">
+          <span class="diag-title" id="diagTitle">🧠 Semantic Engine</span>
+          <span class="diag-status-badge diag-status-ready" id="diagBadge">READY</span>
+        </div>
+        <div class="diag-detail" id="diagDetail">Listening for speech segments. Non-Invention invariant enforced.</div>
+        <div class="diag-hint" id="diagHint">• Hover over any stage card above to inspect live details.</div>
+      </div>
+    </div>
+
+    <!-- Live Pipeline Input Form -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+      <div class="section-title">Live Voice & Text Input</div>
+      <button id="micBtn" class="btn-mic" type="button" onclick="toggleMicrophone()" title="Ativar microfone para ditar comandos por voz">
+        <span id="micIcon">🎙️</span> <span id="micLabel">Ditar Voz (Mic)</span>
+      </button>
+    </div>
+    <form class="speech-form" onsubmit="submitSpeech(event)">
+      <input id="speechInput" class="input-box" placeholder="e.g. Step 1 leads to Step 2..." />
+      <button type="submit" class="primary" style="text-align: center;">Send</button>
+    </form>
+
+    <!-- Manual mxGraph XML Paste & Reset -->
+    <div class="section-title">Manual mxGraph XML Paste</div>
+    <textarea id="xmlInput" class="input-box" placeholder="Paste generated mxGraph XML from pipeline.py here..."></textarea>
+    <div style="display: flex; gap: 8px;">
+      <button style="flex: 1;" onclick="applyPastedXml()">Render Pasted XML</button>
+      <button style="background: #7f1d1d; border-color: #991b1b;" onclick="clearCanvas()">Clear Canvas</button>
+    </div>
+  </div>
+
+  <div id="mainArea">
+    <div id="canvasContainer">
+      <iframe id="diagramFrame" src="https://embed.diagrams.net/?embed=1&proto=json&spin=1&ui=min"></iframe>
+    </div>
+
+    <!-- Dev Tab & Live Telemetry Drawer -->
+    <div id="devDrawer">
+      <div class="dev-drawer-bar" onclick="toggleDevDrawer()">
+        <div class="dev-tabs-group" onclick="event.stopPropagation()">
+          <span style="font-size: 11px; font-weight: 700; color: #cbd5e1; margin-right: 8px;">🛠️ DEV INSPECTOR:</span>
+          <button class="dev-tab-btn active" onclick="switchDevTab('logs')">Live Logs <span id="logCount" style="color: #60a5fa;">(0)</span></button>
+          <button class="dev-tab-btn" onclick="switchDevTab('semantic')">Semantic JSON</button>
+          <button class="dev-tab-btn" onclick="switchDevTab('canvasJson')">Canvas JSON</button>
+          <button class="dev-tab-btn" onclick="switchDevTab('xml')">mxGraph XML</button>
+        </div>
+        <div style="font-size: 11px; color: #9ca3af; display: flex; align-items: center; gap: 6px;">
+          <span id="drawerToggleText">▲ Expand Inspector</span>
+        </div>
+      </div>
+
+      <div class="dev-body">
+        <button class="copy-btn" onclick="copyCurrentDevTab()">Copy Tab Content</button>
+        
+        <!-- Tab 1: Live Logs -->
+        <div id="tab-logs" class="dev-content-pane active">
+          <div id="logsTerminal"></div>
+        </div>
+
+        <!-- Tab 2: Semantic JSON -->
+        <div id="tab-semantic" class="dev-content-pane">
+          <pre id="semanticViewer" class="code-viewer">// Semantic JSON will be displayed here once pipeline processes speech...</pre>
+        </div>
+
+        <!-- Tab 3: Canvas JSON -->
+        <div id="tab-canvasJson" class="dev-content-pane">
+          <pre id="canvasJsonViewer" class="code-viewer">// Canvas JSON geometry & layout will be displayed here...</pre>
+        </div>
+
+        <!-- Tab 4: XML -->
+        <div id="tab-xml" class="dev-content-pane">
+          <pre id="xmlViewer" class="code-viewer">// Generated mxGraph XML for diagrams.net will appear here...</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const iframe = document.getElementById('diagramFrame');
+    let isInitialized = false;
+    let ws = null;
+    let logCounter = 0;
+    let activeDevTab = 'logs';
+    let currentlyInspected = null;
+
+    // Semáforo stages telemetry state
+    const stages = {
+      audio: {
+        name: 'Audio Ingestion',
+        icon: '🎙️',
+        el: document.getElementById('stage-audio'),
+        dot: document.getElementById('dot-audio'),
+        status: 'ready',
+        details: 'Microphone PCM or manual speech input.',
+        hint: '• Captures user utterance and generates source segments (s-1, s-2).'
+      },
+      semantic: {
+        name: 'Semantic Engine',
+        icon: '🧠',
+        el: document.getElementById('stage-semantic'),
+        dot: document.getElementById('dot-semantic'),
+        status: 'ready',
+        details: 'Strict Non-Invention invariant enforced.',
+        hint: '• Skill 1 extracts explicit concepts, topical clusters, and asserted edges.'
+      },
+      layout: {
+        name: 'Canvas Layout',
+        icon: '📐',
+        el: document.getElementById('stage-layout'),
+        dot: document.getElementById('dot-layout'),
+        status: 'ready',
+        details: 'Visual proximity clustering without unrequested arrows.',
+        hint: '• Skill 2 computes 2D spatial coordinates and dynamic container bounds.'
+      },
+      canvas: {
+        name: 'Diagrams Bridge',
+        icon: '🎨',
+        el: document.getElementById('stage-canvas'),
+        dot: document.getElementById('dot-canvas'),
+        status: 'ready',
+        details: 'Embedded diagrams.net WebSocket & postMessage synchronizer.',
+        hint: '• Full-load state synchronization guarantees instant deletion of removed cards.'
+      },
+    };
+
+    function updateStageStatus(stageName, status, details) {
+      const s = stages[stageName];
+      if (!s) return;
+
+      s.status = status;
+      s.el.classList.remove('is-active', 'has-error');
+      s.dot.className = '';
+
+      if (status === 'active') {
+        s.el.classList.add('is-active');
+        s.dot.className = 'dot-spinner';
+      } else if (status === 'error') {
+        s.el.classList.add('has-error');
+        s.dot.className = 'dot-error'; // Frozen stopped spinner
+      } else {
+        s.dot.className = 'dot-ready';
+      }
+
+      if (details) {
+        s.details = details;
+      }
+
+      // If this stage is currently inspected or active, update diagnostic panel
+      if (!currentlyInspected || currentlyInspected === stageName || status === 'active' || status === 'error') {
+        renderDiagnosticPanel(stageName);
+      }
+    }
+
+    function inspectStage(stageName) {
+      currentlyInspected = stageName;
+      document.querySelectorAll('.semaforo-stage').forEach(el => el.classList.remove('inspecting'));
+      if (stages[stageName]) {
+        stages[stageName].el.classList.add('inspecting');
+        renderDiagnosticPanel(stageName);
+      }
+    }
+
+    function resetInspection() {
+      currentlyInspected = null;
+      document.querySelectorAll('.semaforo-stage').forEach(el => el.classList.remove('inspecting'));
+      // Find currently active stage or default to semantic
+      const activeStage = Object.keys(stages).find(k => stages[k].status === 'active' || stages[k].status === 'error') || 'semantic';
+      renderDiagnosticPanel(activeStage);
+    }
+
+    function renderDiagnosticPanel(stageKey) {
+      const s = stages[stageKey];
+      if (!s) return;
+
+      const titleEl = document.getElementById('diagTitle');
+      const badgeEl = document.getElementById('diagBadge');
+      const detailEl = document.getElementById('diagDetail');
+      const hintEl = document.getElementById('diagHint');
+
+      titleEl.innerHTML = `${s.icon} ${s.name}`;
+      detailEl.textContent = s.details;
+      hintEl.textContent = s.hint;
+
+      badgeEl.className = 'diag-status-badge';
+      if (s.status === 'active') {
+        badgeEl.textContent = 'PROCESSING';
+        badgeEl.classList.add('diag-status-active');
+      } else if (s.status === 'error') {
+        badgeEl.textContent = 'ERROR / STALLED';
+        badgeEl.classList.add('diag-status-error');
+      } else {
+        badgeEl.textContent = 'READY';
+        badgeEl.classList.add('diag-status-ready');
+      }
+    }
+
+    function addDevLog(msg, level = 'INFO', timeStr = '') {
+      logCounter++;
+      document.getElementById('logCount').textContent = `(${logCounter})`;
+      const terminal = document.getElementById('logsTerminal');
+      const time = timeStr || new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      div.innerHTML = `<span class="log-time">[${time}]</span><span class="log-level-${level}">[${level}]</span>${escapeHtml(msg)}`;
+      terminal.appendChild(div);
+      // Auto-scroll logs
+      document.getElementById('tab-logs').scrollTop = document.getElementById('tab-logs').scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Connect to WebSocket server
+    function connectWs() {
+      const loc = window.location;
+      if (loc.protocol !== 'http:' && loc.protocol !== 'https:') return;
+      const wsUrl = (loc.protocol === 'https:' ? 'wss://' : 'ws://') + loc.host + '/ws';
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        document.getElementById('overallStatus').textContent = '● CONNECTED';
+        document.getElementById('overallStatus').style.color = '#34d399';
+        addDevLog('WebSocket connected to Semblance backend bridge', 'INFO');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'stage_update') {
+            updateStageStatus(data.stage, data.status, data.details);
+          } else if (data.type === 'log') {
+            addDevLog(data.message, data.level, data.time);
+          } else if (data.type === 'pipeline_success') {
+            // Anti-ghost synchronization: Load full graph so deleted items vanish
+            if (data.xml) {
+              localStorage.setItem('semblance_saved_xml', data.xml);
+              sendToDiagram('load', data.xml);
+            }
+            if (data.semantic_json) {
+              document.getElementById('semanticViewer').textContent = JSON.stringify(data.semantic_json, null, 2);
+            }
+            if (data.canvas_json) {
+              document.getElementById('canvasJsonViewer').textContent = JSON.stringify(data.canvas_json, null, 2);
+            }
+            if (data.xml) {
+              document.getElementById('xmlViewer').textContent = data.xml;
+            }
+            addDevLog(`Pipeline synchronized: ${data.message || 'Rendered updated canvas'}`, 'INFO');
+          } else if (data.type === 'pipeline_error') {
+            updateStageStatus(data.stage || 'semantic', 'error', data.error);
+            addDevLog(`Pipeline failure in [${data.stage}]: ${data.error}`, 'ERROR');
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+
+      ws.onclose = () => {
+        document.getElementById('overallStatus').textContent = '○ DISCONNECTED';
+        document.getElementById('overallStatus').style.color = '#ef4444';
+        for (const k in stages) {
+          stages[k].dot.className = 'dot-disconnected';
+        }
+        addDevLog('WebSocket disconnected. Retrying in 3s...', 'WARN');
+        setTimeout(connectWs, 3000);
+      };
+    }
+
+    // Diagrams.net PostMessage API
+    window.addEventListener('message', (event) => {
+      if (!event.data || typeof event.data !== 'string') return;
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.event === 'init') {
+          isInitialized = true;
+          updateStageStatus('canvas', 'ready', 'Diagrams.net canvas loaded & ready');
+          addDevLog('diagrams.net iframe handshake established', 'INFO');
+          
+          // Auto-restore previous diagram from cache or show empty canvas
+          const savedXml = localStorage.getItem('semblance_saved_xml');
+          if (savedXml) {
+            sendToDiagram('load', savedXml);
+            addDevLog('Restored previous diagram from persistent storage', 'INFO');
+          } else {
+            const emptyXml = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
+            sendToDiagram('load', emptyXml);
+          }
+        }
+      } catch (e) {
+        // Ignore non-json frames
+      }
+    });
+
+    function sendToDiagram(action, xml) {
+      if (!iframe || !iframe.contentWindow) return;
+      const payload = JSON.stringify({ action: action, xml: xml, autosave: 1 });
+      iframe.contentWindow.postMessage(payload, '*');
+    }
+
+    function clearCanvas() {
+      localStorage.removeItem('semblance_saved_xml');
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'clear_canvas' }));
+      }
+      const emptyXml = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
+      sendToDiagram('load', emptyXml);
+      addDevLog('Canvas and session state cleared by user', 'INFO');
+    }
+
+    // Voice Dictation (Web Speech API) & Speech Submission
+    let speechRecognizer = null;
+    let isRecordingVoice = false;
+
+    function initSpeechRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        addDevLog('Web Speech API not supported in this browser. Please use Google Chrome or Microsoft Edge.', 'WARN');
+        return null;
+      }
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'pt-BR';
+
+      rec.onstart = () => {
+        isRecordingVoice = true;
+        const micBtn = document.getElementById('micBtn');
+        if (micBtn) micBtn.classList.add('recording');
+        document.getElementById('micIcon').textContent = '🔴';
+        document.getElementById('micLabel').textContent = 'Ouvindo... (Pausar)';
+        updateStageStatus('audio', 'active', 'Capturando fala pelo microfone do navegador...');
+        addDevLog('Microfone ativado para ditado contínuo (pt-BR)', 'INFO');
+      };
+
+      rec.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            const cleanText = transcript.trim();
+            if (cleanText) {
+              document.getElementById('speechInput').value = cleanText;
+              submitSpeechString(cleanText, 'microphone');
+              updateStageStatus('audio', 'ready', `Transcrito: "${cleanText.slice(0, 24)}..."`);
+              addDevLog(`Fala transcrita: "${cleanText}"`, 'INFO');
+            }
+          } else {
+            interim += transcript;
+          }
+        }
+        if (interim) {
+          document.getElementById('speechInput').placeholder = `Detectando: "${interim.slice(0, 32)}..."`;
+        }
+      };
+
+      rec.onerror = (event) => {
+        if (event.error !== 'no-speech') {
+          addDevLog(`Erro de microfone: ${event.error}`, 'ERROR');
+          updateStageStatus('audio', 'error', `Mic error: ${event.error}`);
+          stopMicrophone();
+        }
+      };
+
+      rec.onend = () => {
+        if (isRecordingVoice) {
+          try { rec.start(); } catch(e) {}
+        } else {
+          stopMicrophone();
+        }
+      };
+
+      return rec;
+    }
+
+    function toggleMicrophone() {
+      if (!speechRecognizer) {
+        speechRecognizer = initSpeechRecognition();
+      }
+      if (!speechRecognizer) {
+        alert('O recurso de reconhecimento de voz por microfone requer Google Chrome ou Microsoft Edge.');
+        return;
+      }
+
+      if (isRecordingVoice) {
+        stopMicrophone();
+      } else {
+        try {
+          speechRecognizer.start();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    function stopMicrophone() {
+      isRecordingVoice = false;
+      if (speechRecognizer) {
+        try { speechRecognizer.stop(); } catch(e) {}
+      }
+      const micBtn = document.getElementById('micBtn');
+      if (micBtn) micBtn.classList.remove('recording');
+      document.getElementById('micIcon').textContent = '🎙️';
+      document.getElementById('micLabel').textContent = 'Ditar Voz (Mic)';
+      document.getElementById('speechInput').placeholder = 'e.g. Step 1 leads to Step 2...';
+      updateStageStatus('audio', 'ready', 'Standby / Ready');
+      addDevLog('Ditado por microfone pausado.', 'INFO');
+    }
+
+    function submitSpeechString(text, source = 'manual') {
+      const val = text.trim();
+      if (!val) return;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'speech_input', text: val, source: source }));
+        document.getElementById('speechInput').value = '';
+      } else {
+        alert('Backend WebSocket not connected. Run: python -m src.server --port 8050 to enable live AI pipeline processing!');
+      }
+    }
+
+    function submitSpeech(e) {
+      e.preventDefault();
+      const input = document.getElementById('speechInput');
+      submitSpeechString(input.value, 'manual');
+    }
+
+    // Dev Tab Drawer Controls
+    function toggleDevDrawer() {
+      const drawer = document.getElementById('devDrawer');
+      const toggleText = document.getElementById('drawerToggleText');
+      drawer.classList.toggle('expanded');
+      toggleText.textContent = drawer.classList.contains('expanded') ? '▼ Collapse Inspector' : '▲ Expand Inspector';
+    }
+
+    function switchDevTab(tabName) {
+      activeDevTab = tabName;
+      const drawer = document.getElementById('devDrawer');
+      if (!drawer.classList.contains('expanded')) {
+        drawer.classList.add('expanded');
+        document.getElementById('drawerToggleText').textContent = '▼ Collapse Inspector';
+      }
+
+      document.querySelectorAll('.dev-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.dev-content-pane').forEach(p => p.classList.remove('active'));
+
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tabName).classList.add('active');
+    }
+
+    function copyCurrentDevTab() {
+      let text = '';
+      if (activeDevTab === 'logs') {
+        text = document.getElementById('logsTerminal').innerText;
+      } else if (activeDevTab === 'semantic') {
+        text = document.getElementById('semanticViewer').innerText;
+      } else if (activeDevTab === 'canvasJson') {
+        text = document.getElementById('canvasJsonViewer').innerText;
+      } else if (activeDevTab === 'xml') {
+        text = document.getElementById('xmlViewer').innerText;
+      }
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copied ' + activeDevTab + ' to clipboard!');
+      });
+    }
+
+    function applyPastedXml() {
+      const xml = document.getElementById('xmlInput').value.trim();
+      if (!xml) {
+        alert('Please paste mxGraph XML first.');
+        return;
+      }
+      sendToDiagram('load', xml);
+      addDevLog('Rendered custom pasted XML', 'INFO');
+    }
+
+    // Initialize diagnostic panel
+    renderDiagnosticPanel('semantic');
+
+    // Connect WebSocket on load
+    connectWs();
+  </script>
+</body>
+</html>

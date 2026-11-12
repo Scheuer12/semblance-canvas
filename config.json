@@ -1,0 +1,26 @@
+{
+  "ai": {
+    "backend": "antigravity_cli",
+    "antigravity_cli_path": "agy",
+    "gemini_cli_path": "gemini",
+    "model": "gemini-3.8-flash-low",
+    "use_google_auth": true,
+    "gemini_api_key": "",
+    "skip_trust": false,
+    "cli_timeout_seconds": 120,
+    "temperature": 0.1
+  },
+  "audio": {
+    "language": "en-US",
+    "energy_threshold": 300,
+    "pause_threshold": 0.8,
+    "phrase_time_limit": 15.0,
+    "device_index": null
+  },
+  "canvas": {
+    "default_node_width": 160,
+    "default_node_height": 60,
+    "horizontal_spacing": 80,
+    "vertical_spacing": 60
+  }
+}
