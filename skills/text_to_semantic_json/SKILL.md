@@ -33,7 +33,24 @@ Analyze transcribed speech segments from the user, determine whether the input r
          "parameters": { "reason": "User commanded removal" }
        }
        ```
+  - **Layout Reorganization & Alignment**: When the user commands restructuring, aligning, or reorganizing the visual layout (e.g., *"Reorganize o layout"*, *"Alinhe as caixas"*, *"Limpe o design"*):
+    ```json
+    {
+      "action": "layout_reorganize",
+      "target_ids": ["canvas"],
+      "parameters": { "scope": "global" }
+    }
+    ```
   - **Template Scaffolding**: When a recognized framework (like Ishikawa / Fishbone) is requested, standard structural categories (e.g., Man, Machine, Method, Material, Measurement, Environment) may be generated as `template_scaffolding`, but leaves/causes remain empty placeholders unless explicitly supplied.
+
+### 4. Semantic Entity Typing (Visual Taxonomy Mapping)
+When extracting concepts into `concepts`, classify each entity's `type` according to its true operational role:
+- `process_step`: Active operational tasks, workflow phases, or transitions (*"verificar escopo"*, *"gerar ordem de compra"*, *"executar compras"*).
+- `side_annotation`: Contextual notes, observations, caveats, or constraints (*"formulário ainda não existe, será criado"*, *"imprevistos durante a execução"*).
+- `data_store`: Repositories, spreadsheets, databases, backlogs, physical archives (*"planilha de aprovação"*, *"planilha de gestão de compras"*, *"backlog do projeto"*, *"galpão"*).
+- `decision_gate`: Approvals, verification checks, or conditional gates (*"quando aprovada"*, *"verificar se todos estão OK"*).
+- `actor`: Departments, external actors, systems, or client roles (*"gestão de compras"*, *"equipe de projetos"*).
+- `concept`: General domain concepts or topics.
 
 ---
 

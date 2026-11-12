@@ -145,11 +145,20 @@ class CanvasSessionState:
         """Reconciles persistent state against new semantic extraction, processing commands."""
         now_iso = datetime.datetime.now().isoformat()
 
-        # Process explicit direct actions (e.g. deletions)
+        # Process explicit direct actions (e.g. deletions, reorganization)
         for act in semantic_data.get("direct_actions", []):
-            if act.get("action") == "delete":
+            action_name = (act.get("action") or "").lower()
+            if any(k in action_name for k in ("delete", "remov", "exclui")):
                 target_ids = act.get("target_ids", [])
                 self.apply_deletion(target_ids, reason="Direct action from speech")
+            else:
+                self.action_history.append({
+                    "action": action_name,
+                    "targets": act.get("target_ids", []),
+                    "status": "DONE",
+                    "timestamp": now_iso,
+                    "expired": True,
+                })
 
         # Sync clusters
         current_cluster_ids = set()

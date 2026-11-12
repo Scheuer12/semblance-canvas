@@ -35,7 +35,18 @@
           "label": { "type": "string" },
           "type": {
             "type": "string",
-            "enum": ["concept", "process_step", "cluster_container", "template_scaffolding", "placeholder"]
+            "enum": [
+              "concept",
+              "process_step",
+              "side_annotation",
+              "data_store",
+              "decision_gate",
+              "actor",
+              "cluster_container",
+              "template_scaffolding",
+              "placeholder"
+            ],
+            "description": "Specific semantic role: process_step (operational action), side_annotation (note/caveat/observation), data_store (spreadsheet/DB/repository), decision_gate (condition/approval), actor (role/system), or concept."
           },
           "cluster_id": { "type": ["string", "null"] },
           "source_ids": {
@@ -79,11 +90,18 @@
       "items": {
         "type": "object",
         "properties": {
-          "action": { "type": "string", "enum": ["move", "group", "align", "create_template", "delete"] },
-          "target_ids": { "type": "array", "items": { "type": "string" } },
+          "action": {
+            "type": "string",
+            "description": "Action type (e.g., move, group, align, layout_reorganize, reorganize, create_template, delete, restyle, rename)."
+          },
+          "target_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Target node/cluster IDs or ['canvas'] for global actions."
+          },
           "parameters": { "type": "object" }
         },
-        "required": ["action", "target_ids"]
+        "required": ["action"]
       }
     }
   },

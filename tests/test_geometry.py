@@ -79,6 +79,37 @@ class TestLayoutGeometryStabilization(unittest.TestCase):
         self.assertIn("jumpStyle=arc", xml)
         self.assertIn("jumpSize=8", xml)
 
+    def test_deterministic_semantic_layout(self):
+        from src.canvas.deterministic_layout import compute_deterministic_canvas_layout
+
+        semantic_data = {
+            "mode": "mode_a_ideas",
+            "clusters": [{"id": "c1", "label": "Pipeline"}],
+            "concepts": [
+                {"id": "step1", "label": "Verificar Escopo", "type": "process_step", "cluster_id": "c1", "source_ids": ["s-1"]},
+                {"id": "note1", "label": "Aviso Importante", "type": "side_annotation", "cluster_id": "c1", "source_ids": ["s-1"]},
+                {"id": "db1", "label": "Planilha de Gestão", "type": "data_store", "cluster_id": "c1", "source_ids": ["s-1"]},
+            ],
+            "relationships": [
+                {"id": "r1", "source": "step1", "target": "db1", "relation_type": "leads_to", "source_ids": ["s-1"]}
+            ],
+        }
+
+        canvas_json = compute_deterministic_canvas_layout(semantic_data)
+        self.assertEqual(len(canvas_json["nodes"]), 3)
+        self.assertEqual(len(canvas_json["visual_clusters"]), 1)
+
+        nodes = {n["id"]: n for n in canvas_json["nodes"]}
+        # Verify typed entity visual styling
+        self.assertIn("fillColor=#DBEAFE", nodes["step1"]["style"])
+        self.assertIn("shape=note", nodes["note1"]["style"])
+        self.assertIn("shape=cylinder3", nodes["db1"]["style"])
+
+        # Verify cluster bounds strictly enclose all nodes
+        cluster = canvas_json["visual_clusters"][0]
+        self.assertGreater(cluster["bounds"]["width"], 200)
+        self.assertGreater(cluster["bounds"]["height"], 100)
+
 
 if __name__ == "__main__":
     unittest.main()
