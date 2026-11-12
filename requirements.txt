@@ -1,6 +1,15 @@
+# Core Server & WebSocket Bridge
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+
+# Schema Validation & Serialization
+jsonschema>=4.20.0
+pydantic>=2.10.0
+
+# Speech Recognition & Audio Capture
 SpeechRecognition>=3.14.0
 pyaudio>=0.2.14
 sounddevice>=0.5.0
-jsonschema>=4.20.0
-pydantic>=2.10.0
+
+# Alternative Direct AI Backend (Optional)
 google-genai>=3.0.0

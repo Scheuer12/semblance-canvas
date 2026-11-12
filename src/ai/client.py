@@ -53,9 +53,15 @@ def extract_json(text: str) -> Dict[str, Any]:
 class BaseAIClient(ABC):
     """Abstract base class for AI connectivity backends."""
 
+    is_ready: bool = False
+
     @abstractmethod
     def generate_json(self, prompt: str, system_instruction: Optional[str] = None) -> Dict[str, Any]:
         """Sends prompt and returns parsed JSON dictionary."""
+        pass
+
+    def warm_up(self) -> None:
+        """Pre-warms the backend process if resident/daemonized. Default is no-op."""
         pass
 
 
@@ -72,6 +78,7 @@ class AntigravityCliClient(BaseAIClient):
         self.timeout_seconds = ai_cfg.cli_timeout_seconds or 120
         self._proc: Optional[subprocess.Popen] = None
         self._lock = threading.Lock()
+        self.is_ready = False
 
     def _ensure_proc(self) -> subprocess.Popen:
         """Starts or restarts the resident agy stream-json daemon."""
@@ -115,11 +122,21 @@ class AntigravityCliClient(BaseAIClient):
             if not init_line:
                 err = self._proc.stderr.read()
                 raise RuntimeError(f"Antigravity CLI failed during startup initialization: {err}")
+            self.is_ready = True
             return self._proc
         except FileNotFoundError as e:
             raise RuntimeError(
                 f"Antigravity CLI not found at '{self.cli_path}'. Install 'agy' and authenticate once interactively."
             ) from e
+
+    def warm_up(self) -> None:
+        """Pre-starts the resident agy daemon in the background to eliminate cold start."""
+        with self._lock:
+            try:
+                self._ensure_proc()
+                self.is_ready = True
+            except Exception as e:
+                print(f"[AIClient] Pre-warm warning: {e}")
 
     def generate_json(self, prompt: str, system_instruction: Optional[str] = None) -> Dict[str, Any]:
         combined_prompt = prompt

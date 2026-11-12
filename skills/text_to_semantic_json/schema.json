@@ -59,7 +59,7 @@
           "target": { "type": "string" },
           "relation_type": {
             "type": "string",
-            "enum": ["depends_on", "causes", "leads_to", "part_of", "sequence_after", "references", "belongs_to_branch"]
+            "description": "Semantic type of the relation (e.g., depends_on, requires, causes, leads_to, part_of, triggers, creates, references, belongs_to_branch)."
           },
           "label": { "type": "string" },
           "directed": { "type": "boolean", "default": true },

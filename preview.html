@@ -413,6 +413,9 @@
         <span id="micIcon">🎙️</span> <span id="micLabel">Ditar Voz (Mic)</span>
       </button>
     </div>
+    <div id="micErrorNotice" style="display: none; background: #450a0a; border: 1px solid #ef4444; color: #fca5a5; padding: 7px 10px; border-radius: 6px; font-size: 11px; line-height: 1.4; margin-top: 4px;">
+      <span id="micErrorText"></span>
+    </div>
     <form class="speech-form" onsubmit="submitSpeech(event)">
       <input id="speechInput" class="input-box" placeholder="e.g. Step 1 leads to Step 2..." />
       <button type="submit" class="primary" style="text-align: center;">Send</button>
@@ -438,7 +441,7 @@
         <div class="dev-tabs-group" onclick="event.stopPropagation()">
           <span style="font-size: 11px; font-weight: 700; color: #cbd5e1; margin-right: 8px;">🛠️ DEV INSPECTOR:</span>
           <button class="dev-tab-btn active" onclick="switchDevTab('logs')">Live Logs <span id="logCount" style="color: #60a5fa;">(0)</span></button>
-          <button class="dev-tab-btn" onclick="switchDevTab('semantic')">Semantic JSON</button>
+          <button class="dev-tab-btn" onclick="switchDevTab('semantic')">Semantic JSON <span id="semanticBadge" style="display: none; margin-left: 3px; font-size: 9px; padding: 1px 4px; border-radius: 3px; background: #ef4444; color: #fff; font-weight: 700;">ERR</span></button>
           <button class="dev-tab-btn" onclick="switchDevTab('canvasJson')">Canvas JSON</button>
           <button class="dev-tab-btn" onclick="switchDevTab('xml')">mxGraph XML</button>
         </div>
@@ -457,6 +460,10 @@
 
         <!-- Tab 2: Semantic JSON -->
         <div id="tab-semantic" class="dev-content-pane">
+          <div id="semanticErrorBanner" style="display: none; background: #450a0a; border: 1px solid #ef4444; color: #fca5a5; padding: 8px 10px; border-radius: 6px; margin-bottom: 8px; font-size: 11px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <strong style="color: #f87171;">⚠️ Schema / Validation Notice</strong>
+            <div id="semanticErrorDesc" style="margin-top: 3px; color: #fecaca; font-family: monospace; font-size: 10.5px;"></div>
+          </div>
           <pre id="semanticViewer" class="code-viewer">// Semantic JSON will be displayed here once pipeline processes speech...</pre>
         </div>
 
@@ -609,6 +616,29 @@
       return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    function renderSemanticJson(jsonData, errorMsg = null) {
+      const viewer = document.getElementById('semanticViewer');
+      const banner = document.getElementById('semanticErrorBanner');
+      const desc = document.getElementById('semanticErrorDesc');
+      const badge = document.getElementById('semanticBadge');
+
+      if (errorMsg) {
+        if (banner) {
+          banner.style.display = 'block';
+          if (desc) desc.textContent = errorMsg;
+        }
+        if (badge) badge.style.display = 'inline-block';
+        const formatted = jsonData ? JSON.stringify(jsonData, null, 2) : '// [No JSON payload generated]';
+        viewer.textContent = `// ⚠️ SCHEMA / PROVENANCE VALIDATION NOTICE:\n// ${errorMsg.replace(/\n/g, '\n// ')}\n// Raw JSON received from AI backend:\n\n${formatted}`;
+      } else {
+        if (banner) banner.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        if (jsonData) {
+          viewer.textContent = JSON.stringify(jsonData, null, 2);
+        }
+      }
+    }
+
     // Connect to WebSocket server
     function connectWs() {
       const loc = window.location;
@@ -630,6 +660,12 @@
             updateStageStatus(data.stage, data.status, data.details);
           } else if (data.type === 'log') {
             addDevLog(data.message, data.level, data.time);
+          } else if (data.type === 'semantic_json_update') {
+            renderSemanticJson(data.semantic_json, data.has_error ? data.error : null);
+          } else if (data.type === 'canvas_json_update') {
+            if (data.canvas_json) {
+              document.getElementById('canvasJsonViewer').textContent = JSON.stringify(data.canvas_json, null, 2);
+            }
           } else if (data.type === 'pipeline_success') {
             // Anti-ghost synchronization: Load full graph so deleted items vanish
             if (data.xml) {
@@ -637,7 +673,7 @@
               sendToDiagram('load', data.xml);
             }
             if (data.semantic_json) {
-              document.getElementById('semanticViewer').textContent = JSON.stringify(data.semantic_json, null, 2);
+              renderSemanticJson(data.semantic_json, null);
             }
             if (data.canvas_json) {
               document.getElementById('canvasJsonViewer').textContent = JSON.stringify(data.canvas_json, null, 2);
@@ -649,6 +685,9 @@
           } else if (data.type === 'pipeline_error') {
             updateStageStatus(data.stage || 'semantic', 'error', data.error);
             addDevLog(`Pipeline failure in [${data.stage}]: ${data.error}`, 'ERROR');
+            if (data.semantic_json) {
+              renderSemanticJson(data.semantic_json, data.error);
+            }
           }
         } catch (e) {
           console.error(e);
@@ -711,12 +750,39 @@
     let speechRecognizer = null;
     let isRecordingVoice = false;
 
+    function logClientEvent(msg, level = 'INFO') {
+      console.log(`[Mic] [${level}] ${msg}`);
+      addDevLog(`[Mic] ${msg}`, level);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: 'client_log', level: level, message: msg }));
+        } catch (e) {}
+      }
+    }
+
+    function showMicError(msg) {
+      const notice = document.getElementById('micErrorNotice');
+      const text = document.getElementById('micErrorText');
+      if (notice && text) {
+        text.textContent = msg;
+        notice.style.display = 'block';
+      }
+    }
+
+    function clearMicError() {
+      const notice = document.getElementById('micErrorNotice');
+      if (notice) notice.style.display = 'none';
+    }
+
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        addDevLog('Web Speech API not supported in this browser. Please use Google Chrome or Microsoft Edge.', 'WARN');
+        const notSupported = 'Web Speech API não suportada neste navegador. Utilize Google Chrome ou Microsoft Edge.';
+        logClientEvent(notSupported, 'WARN');
+        showMicError(notSupported);
         return null;
       }
+
       const rec = new SpeechRecognition();
       rec.continuous = true;
       rec.interimResults = true;
@@ -724,12 +790,22 @@
 
       rec.onstart = () => {
         isRecordingVoice = true;
+        clearMicError();
         const micBtn = document.getElementById('micBtn');
         if (micBtn) micBtn.classList.add('recording');
         document.getElementById('micIcon').textContent = '🔴';
         document.getElementById('micLabel').textContent = 'Ouvindo... (Pausar)';
         updateStageStatus('audio', 'active', 'Capturando fala pelo microfone do navegador...');
-        addDevLog('Microfone ativado para ditado contínuo (pt-BR)', 'INFO');
+        logClientEvent('Microfone conectado e ouvindo continuamente (pt-BR)', 'INFO');
+      };
+
+      rec.onaudiostart = () => {
+        logClientEvent('Dispositivo de áudio capturando fluxo de som...', 'INFO');
+      };
+
+      rec.onspeechstart = () => {
+        logClientEvent('Voz detectada pelo navegador...', 'INFO');
+        document.getElementById('speechInput').placeholder = 'Voz detectada, transcrevendo...';
       };
 
       rec.onresult = (event) => {
@@ -742,7 +818,7 @@
               document.getElementById('speechInput').value = cleanText;
               submitSpeechString(cleanText, 'microphone');
               updateStageStatus('audio', 'ready', `Transcrito: "${cleanText.slice(0, 24)}..."`);
-              addDevLog(`Fala transcrita: "${cleanText}"`, 'INFO');
+              logClientEvent(`Fala finalizada e transcrita: "${cleanText}"`, 'INFO');
             }
           } else {
             interim += transcript;
@@ -754,18 +830,48 @@
       };
 
       rec.onerror = (event) => {
-        if (event.error !== 'no-speech') {
-          addDevLog(`Erro de microfone: ${event.error}`, 'ERROR');
-          updateStageStatus('audio', 'error', `Mic error: ${event.error}`);
-          stopMicrophone();
+        logClientEvent(`Evento onerror recebido: ${event.error}`, 'WARN');
+
+        if (event.error === 'no-speech') {
+          // Normal pause in speech, keep listening without dropping
+          logClientEvent('Intervalo de silêncio detectado (sem fala). Mantendo microfone ativo.', 'INFO');
+          return;
         }
+
+        let friendlyMsg = `⚠️ Erro de microfone: ${event.error}`;
+        if (event.error === 'not-allowed') {
+          friendlyMsg = '⚠️ Permissão de microfone negada. Clique no ícone de configurações/cadeado na barra de URL para autorizar o microfone.';
+        } else if (event.error === 'network') {
+          friendlyMsg = '⚠️ Erro de rede (Google Speech API não conectou). Se estiver no Brave, ative o Google Services em brave://settings. Verifique também a conexão.';
+        } else if (event.error === 'audio-capture') {
+          friendlyMsg = '⚠️ Falha de captura de áudio: o microfone pode estar ocupado por outro aplicativo ou silenciado.';
+        } else if (event.error === 'aborted') {
+          friendlyMsg = '⚠️ Reconhecimento de voz interrompido.';
+        }
+
+        showMicError(friendlyMsg);
+        logClientEvent(friendlyMsg, 'ERROR');
+        updateStageStatus('audio', 'error', friendlyMsg);
+        stopMicrophone(true);
       };
 
       rec.onend = () => {
+        logClientEvent(`Evento onend disparado (isRecordingVoice=${isRecordingVoice})`, 'INFO');
         if (isRecordingVoice) {
-          try { rec.start(); } catch(e) {}
+          // Restart after 200ms to keep continuous listening stable
+          setTimeout(() => {
+            if (isRecordingVoice && speechRecognizer) {
+              try {
+                speechRecognizer.start();
+                logClientEvent('Reconexão automática do microfone bem-sucedida', 'INFO');
+              } catch (e) {
+                // If it already started or cannot start, log softly
+                logClientEvent(`Tentativa de reconexão: ${e.message}`, 'WARN');
+              }
+            }
+          }, 200);
         } else {
-          stopMicrophone();
+          stopMicrophone(false);
         }
       };
 
@@ -773,26 +879,34 @@
     }
 
     function toggleMicrophone() {
-      if (!speechRecognizer) {
-        speechRecognizer = initSpeechRecognition();
-      }
-      if (!speechRecognizer) {
-        alert('O recurso de reconhecimento de voz por microfone requer Google Chrome ou Microsoft Edge.');
+      if (isRecordingVoice) {
+        logClientEvent('Usuário solicitou pausa manual do microfone', 'INFO');
+        stopMicrophone(false);
         return;
       }
 
-      if (isRecordingVoice) {
-        stopMicrophone();
-      } else {
-        try {
-          speechRecognizer.start();
-        } catch (e) {
-          console.error(e);
+      clearMicError();
+      logClientEvent('Usuário clicou para iniciar ditado por microfone', 'INFO');
+
+      if (!speechRecognizer) {
+        speechRecognizer = initSpeechRecognition();
+      }
+      if (!speechRecognizer) return;
+
+      try {
+        isRecordingVoice = true;
+        speechRecognizer.start();
+        logClientEvent('speechRecognizer.start() chamado', 'INFO');
+      } catch (err) {
+        logClientEvent(`Exceção ao chamar speechRecognizer.start(): ${err.message}`, 'ERROR');
+        if (err.name !== 'InvalidStateError') {
+          showMicError(`⚠️ Erro ao iniciar: ${err.message}`);
+          stopMicrophone(true);
         }
       }
     }
 
-    function stopMicrophone() {
+    function stopMicrophone(isError = false) {
       isRecordingVoice = false;
       if (speechRecognizer) {
         try { speechRecognizer.stop(); } catch(e) {}
@@ -802,8 +916,10 @@
       document.getElementById('micIcon').textContent = '🎙️';
       document.getElementById('micLabel').textContent = 'Ditar Voz (Mic)';
       document.getElementById('speechInput').placeholder = 'e.g. Step 1 leads to Step 2...';
-      updateStageStatus('audio', 'ready', 'Standby / Ready');
-      addDevLog('Ditado por microfone pausado.', 'INFO');
+      if (!isError) {
+        updateStageStatus('audio', 'ready', 'Standby / Ready');
+        clearMicError();
+      }
     }
 
     function submitSpeechString(text, source = 'manual') {
